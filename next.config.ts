@@ -32,15 +32,15 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
-    // This is to fix a bug with pdf-parse
     if (!isServer) {
         config.resolve.fallback = {
+            ...config.resolve.fallback,
             fs: false,
             net: false,
             tls: false,
         }
     }
-    config.resolve.alias.fs = false;
+    config.externals.push('pdf-parse');
     return config
   }
 };
