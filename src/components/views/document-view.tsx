@@ -5,18 +5,18 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, serverTimestamp } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
+import { uploadDocumentAction } from '@/app/actions/upload-document';
+import { useToast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, FileUp, FileText, Trash2, BookOpen } from 'lucide-react';
+import { Loader2, FileUp, FileText } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Badge } from '../ui/badge';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_FILE_TYPES = ['application/pdf'];
@@ -34,19 +34,11 @@ const formSchema = z.object({
     ),
 });
 
-async function getPdfText(file: File): Promise<string> {
-  const pdf = (await import('pdf-parse/lib/pdf-parse')).default;
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  const data = await pdf(buffer);
-  return data.text;
-}
-
-
 export function DocumentView() {
   const [isUploading, setIsUploading] = useState(false);
   const { user } = useAuth();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const documentsCollection = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -64,28 +56,39 @@ export function DocumentView() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!user || !documentsCollection) return;
-
+    if (!user) return;
     setIsUploading(true);
 
+    const formData = new FormData();
+    formData.append('title', values.title);
+    formData.append('description', values.description);
+    formData.append('documentFile', values.documentFile[0]);
+
     try {
-      const file = values.documentFile[0] as File;
-      const fileContent = await getPdfText(file);
+      const result = await uploadDocumentAction(formData);
 
-      await addDocumentNonBlocking(documentsCollection, {
-        filename: file.name,
-        uploadDate: new Date().toISOString(),
-        mimeType: file.type,
-        storageLocation: 'firestore', // Placeholder
-        title: values.title,
-        description: values.description,
-        content: fileContent,
-      });
-
-      form.reset();
+      if (result.success) {
+        toast({
+          title: 'Success!',
+          description: 'Your document has been uploaded.',
+        });
+        form.reset();
+      } else {
+        // This is a simplified error handling. A real app would map errors to fields.
+        const errorMessages = Object.values(result.error || {}).flat().join(' ');
+        toast({
+          variant: 'destructive',
+          title: 'Upload Failed',
+          description: errorMessages || 'An unknown error occurred.',
+        });
+      }
     } catch (error) {
       console.error("Error uploading document:", error);
-      // Here you could use a toast to show an error to the user
+      toast({
+        variant: 'destructive',
+        title: 'Uh oh! Something went wrong.',
+        description: 'There was a problem with your request.',
+      });
     } finally {
       setIsUploading(false);
     }

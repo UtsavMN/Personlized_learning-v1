@@ -48,6 +48,7 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
         })
       )
     });
+  // This return is for cases where you might want to chain something, but not block UI
   return promise;
 }
 
