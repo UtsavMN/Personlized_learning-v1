@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuth, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { uploadDocumentAction } from '@/app/actions/upload-document';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +36,7 @@ const formSchema = z.object({
 
 export function DocumentView() {
   const [isUploading, setIsUploading] = useState(false);
-  const { user } = useAuth();
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -135,7 +135,7 @@ export function DocumentView() {
               <FormField
                 control={form.control}
                 name="documentFile"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <FormLabel>PDF File</FormLabel>
                     <FormControl>
