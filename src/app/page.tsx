@@ -3,8 +3,9 @@ import { ChatView } from '@/components/views/chat-view';
 import { CodeView } from '@/components/views/code-view';
 import { MathView } from '@/components/views/math-view';
 import { TimetableView } from '@/components/views/timetable-view';
+import { DocumentView } from '@/components/views/document-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookText, Calculator, CalendarClock, Code2 } from 'lucide-react';
+import { BookText, Calculator, CalendarClock, Code2, FileUp } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -12,7 +13,7 @@ export default function Home() {
       <Header />
       <main className="flex-grow p-4 md:p-6 lg:p-8">
         <Tabs defaultValue="chat" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-2xl mx-auto h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 max-w-3xl mx-auto h-auto">
             <TabsTrigger value="chat" className="py-2">
               <BookText className="w-4 h-4 mr-2" />
               Chat
@@ -29,6 +30,10 @@ export default function Home() {
               <CalendarClock className="w-4 h-4 mr-2" />
               Timetable
             </TabsTrigger>
+            <TabsTrigger value="documents" className="py-2">
+               <FileUp className="w-4 h-4 mr-2" />
+              Documents
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="chat" className="mt-6">
             <ChatView />
@@ -41,6 +46,9 @@ export default function Home() {
           </TabsContent>
           <TabsContent value="timetable" className="mt-6">
             <TimetableView />
+          </TabsContent>
+          <TabsContent value="documents" className="mt-6">
+            <DocumentView />
           </TabsContent>
         </Tabs>
       </main>
