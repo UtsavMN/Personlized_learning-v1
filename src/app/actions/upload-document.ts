@@ -27,7 +27,7 @@ const formSchema = z.object({
     .any()
     .refine((file) => file, 'PDF file is required.')
     .refine(
-      (file) => ACCEPTED_FILE_TYPES.includes(file.type),
+      (file) => file && ACCEPTED_FILE_TYPES.includes(file.type),
       'Only .pdf files are accepted.'
     ),
 });
@@ -79,7 +79,7 @@ export async function uploadDocumentAction(formData: FormData) {
     console.error('Error uploading document:', error);
     return {
       success: false,
-      error: { _server: ['An unexpected error occurred.'] },
+      error: { _server: ['An unexpected error occurred while processing the document.'] },
     };
   }
 }
