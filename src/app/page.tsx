@@ -1,3 +1,5 @@
+'use client';
+
 import { Header } from '@/components/header';
 import { ChatView } from '@/components/views/chat-view';
 import { CodeView } from '@/components/views/code-view';
@@ -6,8 +8,11 @@ import { TimetableView } from '@/components/views/timetable-view';
 import { DocumentView } from '@/components/views/document-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookText, Calculator, CalendarClock, Code2, FileUp } from 'lucide-react';
+import { useAuth } from '@/firebase';
 
 export default function Home() {
+  const { user } = useAuth();
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
@@ -30,10 +35,12 @@ export default function Home() {
               <CalendarClock className="w-4 h-4 mr-2" />
               Timetable
             </TabsTrigger>
-            <TabsTrigger value="documents" className="py-2">
-               <FileUp className="w-4 h-4 mr-2" />
-              Documents
-            </TabsTrigger>
+            {user && (
+              <TabsTrigger value="documents" className="py-2">
+                 <FileUp className="w-4 h-4 mr-2" />
+                Documents
+              </TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="chat" className="mt-6">
             <ChatView />
@@ -47,9 +54,11 @@ export default function Home() {
           <TabsContent value="timetable" className="mt-6">
             <TimetableView />
           </TabsContent>
-          <TabsContent value="documents" className="mt-6">
-            <DocumentView />
-          </TabsContent>
+          {user && (
+            <TabsContent value="documents" className="mt-6">
+              <DocumentView />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>
