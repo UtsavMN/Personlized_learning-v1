@@ -34,6 +34,10 @@
         "description": {
           "type": "string",
           "description": "A user-provided description of the document's content and purpose."
+        },
+        "content": {
+          "type": "string",
+          "description": "The extracted text content of the document."
         }
       },
       "required": [
@@ -43,35 +47,22 @@
         "mimeType",
         "storageLocation",
         "title",
-        "description"
+        "description",
+        "content"
       ]
     }
   },
   "auth": {
     "providers": [
-      "password",
       "anonymous"
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/documents/{documentId}",
-        "definition": {
-          "entityName": "Document",
-          "schema": {
-            "$ref": "#/backend/entities/Document"
-          },
-          "description": "Stores all uploaded documents.  No explicit ownership as documents are managed by the backend.",
-          "params": [
-            {
-              "name": "documentId",
-              "description": "The unique identifier for the document."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The data structure prioritizes simplicity and security for storing academic documents. All documents are stored in a single `documents` collection, which avoids complex authorization logic and supports efficient retrieval. There is no ownership in this design as the documents are pre-uploaded and available in the backend. This achieves authorization independence since every document has the same security posture. The `documents` collection enables secure `list` operations since all documents share the same security requirements and there is no need for filtering based on access control."
+    "'/documents/{documentId}'": {
+      "schema": {
+        "$ref": "#/entities/Document"
+      },
+      "description": "Stores all uploaded documents. No explicit ownership as documents are managed by the backend."
+    }
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,15 +11,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
 import { RightPanel } from '@/components/right-panel';
 import { ChatMessage } from '@/components/chat-message';
 import { Loader2, Send } from 'lucide-react';
 import type { ConfidenceLevel } from '../confidence-meter';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Label } from '../ui/label';
 
 const formSchema = z.object({
   query: z.string().min(1, 'Please enter a question.'),
-  documents: z.string().min(1, 'Please provide some documents for context.'),
+  documentId: z.string().min(1, 'Please select a document.'),
 });
 
 type Message = {
@@ -34,11 +43,18 @@ export function ChatView() {
   const [sources, setSources] = useState<{ id: number; content: string }[]>([]);
   const [confidence, setConfidence] = useState<ConfidenceLevel>('high');
 
+  const firestore = useFirestore();
+  const documentsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'documents');
+  }, [firestore]);
+  const { data: documents, isLoading: documentsLoading } = useCollection(documentsQuery);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       query: '',
-      documents: '',
+      documentId: '',
     },
   });
 
@@ -49,7 +65,19 @@ export function ChatView() {
     const userMessage: Message = { role: 'user', content: values.query };
     setMessages((prev) => [...prev, userMessage]);
 
-    const documentsArray = values.documents.split('\n').filter(doc => doc.trim() !== '');
+    const selectedDocument = documents?.find(doc => doc.id === values.documentId);
+
+    if (!selectedDocument) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: 'Could not find the selected document.',
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setIsLoading(false);
+      return;
+    }
+    
+    const documentsArray = [selectedDocument.content];
     
     const mockSources = documentsArray.map((doc, index) => ({ id: index + 1, content: doc }));
     setSources(mockSources);
@@ -84,7 +112,7 @@ export function ChatView() {
       <Card className="lg:col-span-2 h-full flex flex-col shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline">Cited Question Answering</CardTitle>
-          <CardDescription>Ask a question based on the provided documents. The AI will answer and cite its sources.</CardDescription>
+          <CardDescription>Ask a question based on one of the available documents. The AI will answer and cite its sources.</CardDescription>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col gap-4">
           <ScrollArea className="flex-grow pr-4 -mr-4 h-96 border rounded-md p-4">
@@ -104,18 +132,29 @@ export function ChatView() {
           </ScrollArea>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="documents"
+                name="documentId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Paste source documents here, one per line..."
-                        className="resize-none h-24"
-                        {...field}
-                      />
-                    </FormControl>
+                    <Label>Select a Document</Label>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={documentsLoading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a document to chat with" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {documentsLoading ? (
+                           <SelectItem value="loading" disabled>Loading documents...</SelectItem>
+                        ) : (
+                          documents?.map((doc) => (
+                            <SelectItem key={doc.id} value={doc.id}>{doc.title}</SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -125,6 +164,7 @@ export function ChatView() {
                 name="query"
                 render={({ field }) => (
                   <FormItem>
+                    <Label>Your Question</Label>
                     <FormControl>
                       <div className="relative">
                         <Input placeholder="Ask your question..." {...field} className="pr-12"/>
@@ -142,6 +182,7 @@ export function ChatView() {
                   </FormItem>
                 )}
               />
+              </div>
             </form>
           </Form>
         </CardContent>
