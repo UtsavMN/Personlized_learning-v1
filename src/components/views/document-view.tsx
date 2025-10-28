@@ -54,6 +54,8 @@ export function DocumentView() {
       description: '',
     },
   });
+  
+  const fileRef = form.register("documentFile");
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) return;
@@ -140,7 +142,7 @@ export function DocumentView() {
                       <Input 
                         type="file" 
                         accept="application/pdf"
-                        onChange={(e) => field.onChange(e.target.files)}
+                        {...fileRef}
                       />
                     </FormControl>
                     <FormMessage />
@@ -151,6 +153,11 @@ export function DocumentView() {
                 {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
                 Upload Document
               </Button>
+               {!user && (
+                <p className="text-xs text-center text-muted-foreground">
+                  (You must be signed in to upload)
+                </p>
+              )}
             </form>
           </Form>
         </CardContent>
