@@ -7,7 +7,7 @@ type SourcePanelProps = {
 
 export function SourcePanel({ sources }: SourcePanelProps) {
   return (
-    <div>
+    <>
       <h3 className="text-lg font-semibold mb-2 font-headline">Retrieved Sources</h3>
       {sources.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center p-6 border-2 border-dashed rounded-lg h-96">
@@ -25,13 +25,13 @@ export function SourcePanel({ sources }: SourcePanelProps) {
                   </CardTitle>
                   <CardDescription className="text-xs pt-2 text-foreground break-words">
                     {source.content}
-                  </CardHeader>
-                </Card>
+                  </CardDescription>
+                </CardHeader>
               </Card>
             ))}
           </div>
         </ScrollArea>
       )}
-    </div>
+    </>
   );
 }
