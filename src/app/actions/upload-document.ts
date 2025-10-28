@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { getFirestore, addDoc, collection } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
+import pdf from 'pdf-parse';
 
 // Since this is a server action, we need to initialize Firebase on the server.
 // This is different from the client-side initialization.
@@ -34,7 +35,6 @@ const formSchema = z.object({
 });
 
 async function getPdfText(file: File): Promise<string> {
-  const pdf = (await import('pdf-parse/lib/pdf-parse')).default;
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   const data = await pdf(buffer);
