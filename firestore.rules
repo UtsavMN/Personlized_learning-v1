@@ -1,0 +1,35 @@
+/**
+ * @fileoverview Firestore Security Rules for the academic document repository.
+ *
+ * Core Philosophy:
+ * This ruleset provides public read access to all documents while preventing unauthorized modifications.
+ * There is no ownership model; all documents are considered publicly accessible for reading.
+ *
+ * Data Structure:
+ * Documents are stored in the top-level `/documents/{documentId}` collection.
+ *
+ * Key Security Decisions:
+ * - Documents are pre-uploaded and managed by the backend.
+ * - No user-specific data or ownership is enforced.
+ * - Anyone can read any document.
+ * - Writes (create, update, delete) are completely forbidden to prevent unauthorized modifications of the pre-uploaded documents.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Grants public read access to all documents in the 'documents' collection and denies all writes.
+     * @path /documents/{documentId}
+     * @allow (get, list) Anyone can read a document.
+     * @deny (create, update, delete) No one can create, update, or delete a document.
+     * @principle Allows public read access while preventing unauthorized modifications.
+     */
+    match /documents/{documentId} {
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

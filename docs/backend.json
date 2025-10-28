@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "Document": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Document",
+      "type": "object",
+      "description": "Represents a document uploaded to the system, such as a PDF course description, lab manual, or past paper.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the document."
+        },
+        "filename": {
+          "type": "string",
+          "description": "The original filename of the uploaded document."
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "The date and time when the document was uploaded.",
+          "format": "date-time"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "The MIME type of the uploaded document (e.g., 'application/pdf')."
+        },
+        "storageLocation": {
+          "type": "string",
+          "description": "The location where the document is stored (e.g., a file path or cloud storage URL).  This assumes the file is available on the backend."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the document as extracted from the file metadata or content."
+        },
+        "description": {
+          "type": "string",
+          "description": "A user-provided description of the document's content and purpose."
+        }
+      },
+      "required": [
+        "id",
+        "filename",
+        "uploadDate",
+        "mimeType",
+        "storageLocation",
+        "title",
+        "description"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/documents/{documentId}",
+        "definition": {
+          "entityName": "Document",
+          "schema": {
+            "$ref": "#/backend/entities/Document"
+          },
+          "description": "Stores all uploaded documents.  No explicit ownership as documents are managed by the backend.",
+          "params": [
+            {
+              "name": "documentId",
+              "description": "The unique identifier for the document."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The data structure prioritizes simplicity and security for storing academic documents. All documents are stored in a single `documents` collection, which avoids complex authorization logic and supports efficient retrieval. There is no ownership in this design as the documents are pre-uploaded and available in the backend. This achieves authorization independence since every document has the same security posture. The `documents` collection enables secure `list` operations since all documents share the same security requirements and there is no need for filtering based on access control."
+  }
+}
