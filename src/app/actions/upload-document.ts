@@ -18,7 +18,6 @@ const firebaseApp = getFirebaseServer();
 const firestore = getFirestore(firebaseApp);
 
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_FILE_TYPES = ['application/pdf'];
 
 const formSchema = z.object({
@@ -27,7 +26,6 @@ const formSchema = z.object({
   documentFile: z
     .any()
     .refine((file) => file, 'PDF file is required.')
-    .refine((file) => file.size <= MAX_FILE_SIZE, `Max file size is 5MB.`)
     .refine(
       (file) => ACCEPTED_FILE_TYPES.includes(file.type),
       'Only .pdf files are accepted.'

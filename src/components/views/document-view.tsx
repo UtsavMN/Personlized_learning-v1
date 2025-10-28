@@ -18,7 +18,6 @@ import { Loader2, FileUp, FileText } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_FILE_TYPES = ['application/pdf'];
 
 const formSchema = z.object({
@@ -27,7 +26,6 @@ const formSchema = z.object({
   documentFile: z
     .any()
     .refine((files) => files?.length == 1, 'PDF file is required.')
-    .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, `Max file size is 5MB.`)
     .refine(
       (files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type),
       'Only .pdf files are accepted.'
