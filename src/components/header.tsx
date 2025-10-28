@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/firebase';
+import { useAuth, useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -16,7 +16,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 
 function UserNav() {
   const auth = useAuth();
-  const { user, isUserLoading } = useAuth();
+  const { user, isUserLoading } = useUser();
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();

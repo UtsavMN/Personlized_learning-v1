@@ -8,10 +8,10 @@ import { TimetableView } from '@/components/views/timetable-view';
 import { DocumentView } from '@/components/views/document-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookText, Calculator, CalendarClock, Code2, FileUp } from 'lucide-react';
-import { useAuth } from '@/firebase';
+import { useUser } from '@/firebase';
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user } = useUser();
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
