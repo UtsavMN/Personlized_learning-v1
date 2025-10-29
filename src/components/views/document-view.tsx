@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,8 +33,19 @@ const formSchema = z.object({
     ),
 });
 
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  const { user } = useUser();
+  return (
+    <Button type="submit" disabled={pending || !user} className="w-full">
+      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+      Upload Document
+    </Button>
+  );
+}
+
+
 export function DocumentView() {
-  const [isUploading, setIsUploading] = useState(false);
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -44,55 +56,43 @@ export function DocumentView() {
   }, [firestore]);
 
   const { data: documents, isLoading: documentsLoading } = useCollection(documentsCollection);
+  
+  const [state, formAction] = useFormState(uploadDocumentAction, {
+    success: false,
+    message: '',
+    errors: {},
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
       description: '',
+      documentFile: undefined,
     },
   });
   
   const fileRef = form.register("documentFile");
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!user) return;
-    setIsUploading(true);
-
-    const formData = new FormData();
-    formData.append('title', values.title);
-    formData.append('description', values.description);
-    formData.append('documentFile', values.documentFile[0]);
-
-    try {
-      const result = await uploadDocumentAction(formData);
-
-      if (result.success) {
+  useEffect(() => {
+    if (state.message) {
+      if (state.success) {
         toast({
           title: 'Success!',
-          description: 'Your document has been uploaded.',
+          description: state.message,
         });
         form.reset();
       } else {
-        // This is a simplified error handling. A real app would map errors to fields.
-        const errorMessages = Object.values(result.error || {}).flat().join(' ');
+        const description = state.errors ? Object.values(state.errors).flat().join(' ') : state.message;
         toast({
           variant: 'destructive',
           title: 'Upload Failed',
-          description: errorMessages || 'An unknown error occurred.',
+          description: description || 'An unknown error occurred.',
         });
       }
-    } catch (error) {
-      console.error("Error uploading document:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem with your request.',
-      });
-    } finally {
-      setIsUploading(false);
     }
-  }
+  }, [state, toast, form]);
+
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 h-full">
@@ -102,62 +102,61 @@ export function DocumentView() {
           <CardDescription>Upload a PDF document to be used by the AI.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Document Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Introduction to AI" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="A brief summary of the document's content." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="documentFile"
-                render={() => (
-                  <FormItem>
-                    <FormLabel>PDF File</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="file" 
-                        accept="application/pdf"
-                        {...fileRef}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={isUploading || !user} className="w-full">
-                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-                Upload Document
-              </Button>
+          <form action={formAction}>
+            <div className="space-y-4">
+              <Form {...form}>
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Document Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Introduction to AI" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="A brief summary of the document's content." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="documentFile"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>PDF File</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="file" 
+                          accept="application/pdf"
+                          {...fileRef}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </Form>
+              <SubmitButton />
                {!user && (
                 <p className="text-xs text-center text-muted-foreground">
                   (You must be signed in to upload)
                 </p>
               )}
-            </form>
-          </Form>
+            </div>
+          </form>
         </CardContent>
       </Card>
 
