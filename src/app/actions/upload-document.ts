@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { getFirestore, addDoc, collection } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
-import pdf from 'pdf-parse';
 
 // Since this is a server action, we need to initialize Firebase on the server.
 // This is different from the client-side initialization.
@@ -35,6 +34,7 @@ const formSchema = z.object({
 });
 
 async function getPdfText(file: File): Promise<string> {
+  const pdf = require('pdf-parse');
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   const data = await pdf(buffer);
@@ -51,7 +51,6 @@ export async function uploadDocumentAction(formData: FormData) {
   const validatedFields = formSchema.safeParse(values);
 
   if (!validatedFields.success) {
-    console.error('Validation failed:', validatedFields.error.flatten().fieldErrors);
     return {
       success: false,
       error: validatedFields.error.flatten().fieldErrors,
@@ -65,7 +64,7 @@ export async function uploadDocumentAction(formData: FormData) {
 
     const documentsCollection = collection(firestore, 'documents');
 
-    await addDoc(documentsCollection, {
+    const docRef = await addDoc(documentsCollection, {
       filename: documentFile.name,
       uploadDate: new Date().toISOString(),
       mimeType: documentFile.type,
@@ -75,12 +74,12 @@ export async function uploadDocumentAction(formData: FormData) {
       content: fileContent,
     });
 
-    return { success: true };
-  } catch (error) {
+    return { success: true, docId: docRef.id };
+  } catch (error: any) {
     console.error('Error uploading document:', error);
     return {
       success: false,
-      error: { _server: ['An unexpected error occurred while processing the document.'] },
+      error: { _server: [error.message || 'An unexpected error occurred while processing the document.'] },
     };
   }
 }
