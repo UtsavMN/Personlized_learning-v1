@@ -42,24 +42,24 @@ async function getPdfText(file: File): Promise<string> {
 }
 
 export async function uploadDocumentAction(formData: FormData) {
-  const values = {
-    title: formData.get('title'),
-    description: formData.get('description'),
-    documentFile: formData.get('documentFile'),
-  };
-
-  const validatedFields = formSchema.safeParse(values);
-
-  if (!validatedFields.success) {
-    return {
-      success: false,
-      error: validatedFields.error.flatten().fieldErrors,
-    };
-  }
-  
-  const { title, description, documentFile } = validatedFields.data;
-
   try {
+    const values = {
+      title: formData.get('title'),
+      description: formData.get('description'),
+      documentFile: formData.get('documentFile'),
+    };
+
+    const validatedFields = formSchema.safeParse(values);
+
+    if (!validatedFields.success) {
+      return {
+        success: false,
+        error: validatedFields.error.flatten().fieldErrors,
+      };
+    }
+    
+    const { title, description, documentFile } = validatedFields.data;
+
     const fileContent = await getPdfText(documentFile);
 
     const documentsCollection = collection(firestore, 'documents');
