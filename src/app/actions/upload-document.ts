@@ -24,7 +24,7 @@ const formSchema = z.object({
   description: z.string().min(10, 'Description must be at least 10 characters.'),
   documentFile: z
     .any()
-    .refine((file) => file, 'PDF file is required.')
+    .refine((file): file is File => file instanceof File, 'PDF file is required.')
     .refine(
       (file) => file && ACCEPTED_FILE_TYPES.includes(file.type),
       'Only .pdf files are accepted.'
