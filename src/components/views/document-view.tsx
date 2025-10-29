@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,29 +20,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 
 const ACCEPTED_FILE_TYPES = ['application/pdf'];
 
+// This schema is for client-side validation with React Hook Form
 const formSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters.'),
   description: z.string().min(10, 'Description must be at least 10 characters.'),
   documentFile: z
     .any()
-    .refine((files) => files?.length == 1, 'PDF file is required.')
+    .refine((files): files is FileList => files instanceof FileList && files.length > 0, 'PDF file is required.')
     .refine(
-      (files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type),
+      (files) => ACCEPTED_FILE_TYPES.includes(files[0]?.type),
       'Only .pdf files are accepted.'
     ),
 });
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  const { user } = useUser();
-  return (
-    <Button type="submit" disabled={pending || !user} className="w-full">
-      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-      Upload Document
-    </Button>
-  );
-}
-
 
 export function DocumentView() {
   const { user } = useUser();
@@ -83,11 +71,12 @@ export function DocumentView() {
         });
         form.reset();
       } else {
-        const description = state.errors ? Object.values(state.errors).flat().join(' ') : state.message;
+        // Use server-side errors if available, otherwise use client-side errors
+        const errorDescription = state.message;
         toast({
           variant: 'destructive',
           title: 'Upload Failed',
-          description: description || 'An unknown error occurred.',
+          description: errorDescription || 'An unknown error occurred.',
         });
       }
     }
@@ -102,61 +91,72 @@ export function DocumentView() {
           <CardDescription>Upload a PDF document to be used by the AI.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction}>
-            <div className="space-y-4">
-              <Form {...form}>
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Document Title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Introduction to AI" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="A brief summary of the document's content." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="documentFile"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>PDF File</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="file" 
-                          accept="application/pdf"
-                          {...fileRef}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </Form>
-              <SubmitButton />
+          <Form {...form}>
+            {/* The form now uses react-hook-form's handleSubmit to trigger the server action */}
+            <form onSubmit={form.handleSubmit(() => {
+              const formData = new FormData();
+              const formValues = form.getValues();
+              formData.append('title', formValues.title);
+              formData.append('description', formValues.description);
+              if (formValues.documentFile && formValues.documentFile.length > 0) {
+                formData.append('documentFile', formValues.documentFile[0]);
+              }
+              formAction(formData);
+            })} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Document Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Introduction to AI" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="A brief summary of the document's content." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="documentFile"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>PDF File</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="file" 
+                        accept="application/pdf"
+                        {...fileRef}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={form.formState.isSubmitting || !user} className="w-full">
+                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+                Upload Document
+              </Button>
                {!user && (
                 <p className="text-xs text-center text-muted-foreground">
                   (You must be signed in to upload)
                 </p>
               )}
-            </div>
-          </form>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 
