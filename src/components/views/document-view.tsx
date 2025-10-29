@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useEffect, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -57,7 +57,7 @@ export function DocumentView() {
 
   const { data: documents, isLoading: documentsLoading } = useCollection(documentsCollection);
   
-  const [state, formAction] = useFormState(uploadDocumentAction, {
+  const [state, formAction] = useActionState(uploadDocumentAction, {
     success: false,
     message: '',
     errors: {},
