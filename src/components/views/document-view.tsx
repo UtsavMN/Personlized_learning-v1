@@ -45,7 +45,7 @@ export function DocumentView() {
 
   const { data: documents, isLoading: documentsLoading } = useCollection(documentsCollection);
   
-  const [state, formAction] = useActionState(uploadDocumentAction, {
+  const [state, formAction, isPending] = useActionState(uploadDocumentAction, {
     success: false,
     message: '',
     errors: {},
@@ -71,7 +71,7 @@ export function DocumentView() {
         });
         form.reset();
       } else {
-        // Use server-side errors if available, otherwise use client-side errors
+        // Use server-side errors if available
         const errorDescription = state.message;
         toast({
           variant: 'destructive',
@@ -92,17 +92,7 @@ export function DocumentView() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            {/* The form now uses react-hook-form's handleSubmit to trigger the server action */}
-            <form onSubmit={form.handleSubmit(() => {
-              const formData = new FormData();
-              const formValues = form.getValues();
-              formData.append('title', formValues.title);
-              formData.append('description', formValues.description);
-              if (formValues.documentFile && formValues.documentFile.length > 0) {
-                formData.append('documentFile', formValues.documentFile[0]);
-              }
-              formAction(formData);
-            })} className="space-y-4">
+            <form action={formAction} className="space-y-4">
               <FormField
                 control={form.control}
                 name="title"
@@ -146,8 +136,8 @@ export function DocumentView() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={form.formState.isSubmitting || !user} className="w-full">
-                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+              <Button type="submit" disabled={isPending || !user} className="w-full">
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
                 Upload Document
               </Button>
                {!user && (

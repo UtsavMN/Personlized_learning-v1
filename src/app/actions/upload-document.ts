@@ -17,7 +17,6 @@ function getFirebaseServer() {
 const formSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters.'),
   description: z.string().min(10, 'Description must be at least 10 characters.'),
-  documentFile: z.any(), // We will validate the file from FormData directly
 });
 
 export async function uploadDocumentAction(prevState: any, formData: FormData) {
@@ -25,6 +24,19 @@ export async function uploadDocumentAction(prevState: any, formData: FormData) {
     const firebaseApp = getFirebaseServer();
     const firestore = getFirestore(firebaseApp);
 
+    const validatedFields = formSchema.safeParse({
+      title: formData.get('title'),
+      description: formData.get('description'),
+    });
+    
+    if (!validatedFields.success) {
+      return {
+        success: false,
+        message: 'Validation failed.',
+        errors: validatedFields.error.flatten().fieldErrors,
+      };
+    }
+    
     const documentFile = formData.get('documentFile') as File | null;
     
     // Manual validation for the file
@@ -35,20 +47,6 @@ export async function uploadDocumentAction(prevState: any, formData: FormData) {
        return { success: false, message: 'Only .pdf files are accepted.', errors: { documentFile: ['Only .pdf files are accepted.'] } };
     }
 
-
-    const validatedFields = formSchema.safeParse({
-      title: formData.get('title'),
-      description: formData.get('description'),
-      documentFile: documentFile,
-    });
-    
-    if (!validatedFields.success) {
-      return {
-        success: false,
-        message: 'Validation failed.',
-        errors: validatedFields.error.flatten().fieldErrors,
-      };
-    }
     
     const { title, description } = validatedFields.data;
 
