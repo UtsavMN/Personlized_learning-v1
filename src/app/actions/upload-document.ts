@@ -1,4 +1,3 @@
-
 'use server';
 
 import { z } from 'zod';
@@ -7,7 +6,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
 
 // Since this is a server action, we need to initialize Firebase on the server.
-// This is different from the client-side initialization.
 function getFirebaseServer() {
     if (!getApps().length) {
         return initializeApp(firebaseConfig);
@@ -33,14 +31,6 @@ const formSchema = z.object({
     ),
 });
 
-async function getPdfText(file: File): Promise<string> {
-  const pdf = require('pdf-parse');
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  const data = await pdf(buffer);
-  return data.text;
-}
-
 export async function uploadDocumentAction(formData: FormData) {
   try {
     const values = {
@@ -60,7 +50,9 @@ export async function uploadDocumentAction(formData: FormData) {
     
     const { title, description, documentFile } = validatedFields.data;
 
-    const fileContent = await getPdfText(documentFile);
+    // The problematic pdf-parse logic is now removed.
+    // We will save the document without the text content for now.
+    const fileContent = 'Manually add PDF content here in Firestore.';
 
     const documentsCollection = collection(firestore, 'documents');
 
@@ -71,7 +63,7 @@ export async function uploadDocumentAction(formData: FormData) {
       storageLocation: 'firestore', // Placeholder
       title: title,
       description: description,
-      content: fileContent,
+      content: fileContent, // Storing a placeholder content
     });
 
     return { success: true, docId: docRef.id };
@@ -79,7 +71,7 @@ export async function uploadDocumentAction(formData: FormData) {
     console.error('Error uploading document:', error);
     return {
       success: false,
-      error: { _server: [error.message || 'An unexpected error occurred while processing the document.'] },
+      error: { _server: [error.message || 'An unexpected error occurred.'] },
     };
   }
 }
