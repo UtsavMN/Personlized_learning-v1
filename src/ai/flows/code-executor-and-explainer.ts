@@ -77,5 +77,15 @@ const codeExecutorAndExplainerFlow = ai.defineFlow(
 );
 
 export async function codeExecutorAndExplainer(input: CodeExecutorAndExplainerInput): Promise<CodeExecutorAndExplainerOutput> {
-  return codeExecutorAndExplainerFlow(input);
+  try {
+    return await codeExecutorAndExplainerFlow(input);
+  } catch (error: any) {
+    if (error?.message?.includes('API key') || error?.message?.includes('GEMINI_API_KEY')) {
+      return {
+        executionResult: 'N/A',
+        explanation: 'AI features are not configured. Please add a GOOGLE_GENAI_API_KEY to your .env file.',
+      };
+    }
+    throw error;
+  }
 }

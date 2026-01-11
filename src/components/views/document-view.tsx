@@ -1,12 +1,9 @@
 'use client';
 
-import { useEffect, useActionState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useUser, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import { uploadDocumentAction } from '@/app/actions/upload-document';
 import { useToast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
@@ -34,23 +31,11 @@ const formSchema = z.object({
 });
 
 export function DocumentView() {
-  const { user } = useUser();
-  const firestore = useFirestore();
   const { toast } = useToast();
-
-  const documentsCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'documents');
-  }, [firestore]);
-
-  const { data: documents, isLoading: documentsLoading } = useCollection(documentsCollection);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   
-  const [state, formAction, isPending] = useActionState(uploadDocumentAction, {
-    success: false,
-    message: '',
-    errors: {},
-  });
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -62,25 +47,75 @@ export function DocumentView() {
   
   const fileRef = form.register("documentFile");
 
+  // Load documents from local storage
   useEffect(() => {
-    if (state.message) {
-      if (state.success) {
+    const loadDocuments = async () => {
+      try {
+        setDocumentsLoading(true);
+        const response = await fetch('/api/documents');
+        if (response.ok) {
+          const docs = await response.json();
+          setDocuments(docs);
+        } else {
+          console.error('Failed to load documents');
+        }
+      } catch (error) {
+        console.error('Error loading documents:', error);
+      } finally {
+        setDocumentsLoading(false);
+      }
+    };
+    
+    loadDocuments();
+  }, []);
+
+  // Handle form submission
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    try {
+      setIsUploading(true);
+      
+      const formData = new FormData();
+      formData.append('title', data.title);
+      formData.append('description', data.description);
+      formData.append('documentFile', data.documentFile[0]);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
         toast({
           title: 'Success!',
-          description: state.message,
+          description: result.message,
         });
         form.reset();
+        // Reload documents after successful upload
+        const docsResponse = await fetch('/api/documents');
+        if (docsResponse.ok) {
+          const docs = await docsResponse.json();
+          setDocuments(docs);
+        }
       } else {
-        // Use server-side errors if available
-        const errorDescription = state.message;
         toast({
           variant: 'destructive',
           title: 'Upload Failed',
-          description: errorDescription || 'An unknown error occurred.',
+          description: result.message || 'An unknown error occurred.',
         });
       }
+    } catch (error: any) {
+      console.error('Error uploading document:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload Failed',
+        description: error.message || 'An error occurred while uploading.',
+      });
+    } finally {
+      setIsUploading(false);
     }
-  }, [state, toast, form]);
+  };
 
 
   return (
@@ -92,7 +127,7 @@ export function DocumentView() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form action={formAction} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="title"
@@ -136,15 +171,10 @@ export function DocumentView() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isPending || !user} className="w-full">
-                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+              <Button type="submit" disabled={isUploading} className="w-full">
+                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
                 Upload Document
               </Button>
-               {!user && (
-                <p className="text-xs text-center text-muted-foreground">
-                  (You must be signed in to upload)
-                </p>
-              )}
             </form>
           </Form>
         </CardContent>

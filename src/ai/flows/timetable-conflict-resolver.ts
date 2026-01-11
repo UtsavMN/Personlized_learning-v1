@@ -51,7 +51,17 @@ export type TimetableConflictResolverOutput = z.infer<
 export async function timetableConflictResolver(
   input: TimetableConflictResolverInput
 ): Promise<TimetableConflictResolverOutput> {
-  return timetableConflictResolverFlow(input);
+  try {
+    return await timetableConflictResolverFlow(input);
+  } catch (error: any) {
+    if (error?.message?.includes('API key') || error?.message?.includes('GEMINI_API_KEY')) {
+      return {
+        resolutionOptions: [],
+        policyCitations: ['AI features are not configured. Please add a GOOGLE_GENAI_API_KEY to your .env file.'],
+      };
+    }
+    throw error;
+  }
 }
 
 const prompt = ai.definePrompt({

@@ -13,7 +13,77 @@ export function ChatMessage({ role, content }: ChatMessageProps) {
 
   // Regex to find citations like [1], [2], etc.
   const citationRegex = /\[(\d+)\]/g;
-  const parts = content.split(citationRegex);
+  
+  // Regex to find bullet points (lines starting with - or •)
+  const bulletPointRegex = /^[-•]\s+(.+)$/gm;
+  
+  // Check if content has bullet points
+  const hasBulletPoints = bulletPointRegex.test(content);
+  bulletPointRegex.lastIndex = 0; // Reset regex
+  
+  // Split content into sections by double newlines (for structured content)
+  const sections = content.split('\n\n').filter(s => s.trim());
+  
+  const renderSection = (text: string) => {
+    // Check if this section has bullet points
+    const bulletMatches = text.match(/^[-•]\s+(.+)$/gm);
+    
+    if (bulletMatches && bulletMatches.length > 0) {
+      // Parse bullet points
+      const bulletPoints = text.split('\n').filter(line => line.trim().startsWith('-') || line.trim().startsWith('•'));
+      
+      return (
+        <ul className="space-y-2 ml-4">
+          {bulletPoints.map((bullet, idx) => {
+            const content = bullet.replace(/^[-•]\s+/, '').trim();
+            const parts = content.split(citationRegex);
+            
+            return (
+              <li key={idx} className="list-disc list-inside">
+                {parts.map((part, i) => {
+                  if (i % 2 === 1) {
+                    // Citation
+                    return (
+                      <Badge
+                        key={i}
+                        variant="secondary"
+                        className="ml-1 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/80"
+                      >
+                        [{part}]
+                      </Badge>
+                    );
+                  }
+                  return <span key={i}>{part}</span>;
+                })}
+              </li>
+            );
+          })}
+        </ul>
+      );
+    }
+    
+    // Regular paragraph with potential citations
+    const parts = text.split(citationRegex);
+    return (
+      <p className="inline">
+        {parts.map((part, i) => {
+          if (i % 2 === 1) {
+            // Citation - render as an inline <span> to avoid nested <div> in <p>
+            return (
+              <span
+                key={i}
+                role="button"
+                className="mx-1 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium cursor-pointer bg-accent text-accent-foreground hover:bg-accent/80"
+              >
+                [{part}]
+              </span>
+            );
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </p>
+    );
+  };
 
   return (
     <div className={cn('flex items-start space-x-4', isAssistant ? '' : 'justify-end')}>
@@ -32,23 +102,13 @@ export function ChatMessage({ role, content }: ChatMessageProps) {
             : 'bg-primary text-primary-foreground'
         )}
       >
-        <p className="leading-relaxed">
-          {parts.map((part, index) => {
-            if (index % 2 === 1) {
-              // This is a citation number
-              return (
-                <Badge
-                  key={index}
-                  variant="secondary"
-                  className="mx-1 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/80"
-                >
-                  {part}
-                </Badge>
-              );
-            }
-            return <span key={index}>{part}</span>;
-          })}
-        </p>
+        <div className="leading-relaxed space-y-3">
+          {sections.map((section, idx) => (
+            <div key={idx}>
+              {renderSection(section)}
+            </div>
+          ))}
+        </div>
       </div>
       {!isAssistant && (
          <Avatar className="h-9 w-9">

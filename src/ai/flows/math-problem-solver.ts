@@ -26,14 +26,24 @@ const MathProblemSolverOutputSchema = z.object({
 export type MathProblemSolverOutput = z.infer<typeof MathProblemSolverOutputSchema>;
 
 export async function mathProblemSolver(input: MathProblemSolverInput): Promise<MathProblemSolverOutput> {
-  return mathProblemSolverFlow(input);
+  try {
+    return await mathProblemSolverFlow(input);
+  } catch (error: any) {
+    if (error?.message?.includes('API key') || error?.message?.includes('GEMINI_API_KEY')) {
+      return {
+        solution: 'N/A',
+        citations: 'AI features are not configured. Please add a GOOGLE_GENAI_API_KEY to your .env file.',
+      };
+    }
+    throw error;
+  }
 }
 
 const prompt = ai.definePrompt({
   name: 'mathProblemSolverPrompt',
   input: {schema: MathProblemSolverInputSchema},
   output: {schema: MathProblemSolverOutputSchema},
-  prompt: `You are an expert math solver and tutor. Given a math problem and relevant course materials, provide a step-by-step solution and cite the formulas or concepts used from the materials.\n\nProblem: {{{problem}}}\nCourse Materials: {{{courseMaterials}}}\n\nSolution and Citations:`,
+  prompt: `You are an expert math solver and tutor. Respond in a concise, modern, pointwise style as follows:\n\n- Start with a one-sentence introduction if helpful.\n- Present the step-by-step solution as a bullet list; each step must be on its own line and start with a dash "-".\n- After any step that uses the provided course materials, add an inline citation in square brackets (e.g., [1]).\n- End with a short concluding summary if relevant.\n- Finally, include a "Citations" section that lists the referenced sources and their indices.\n\nProblem: {{{problem}}}\nCourse Materials: {{{courseMaterials}}}\n\nSolution (bullet list) and Citations:`,
 });
 
 const mathProblemSolverFlow = ai.defineFlow(

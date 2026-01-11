@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { citedQuestionAnswering, type CitedQuestionAnsweringOutput } from '@/ai/flows/cited-question-answering';
+import { summarizeHeadings } from '@/ai/flows/summarize-headings';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,8 +16,6 @@ import { RightPanel } from '@/components/right-panel';
 import { ChatMessage } from '@/components/chat-message';
 import { Loader2, Send } from 'lucide-react';
 import type { ConfidenceLevel } from '../confidence-meter';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
 import {
   Select,
   SelectContent,
@@ -42,13 +41,30 @@ export function ChatView() {
   const [isLoading, setIsLoading] = useState(false);
   const [sources, setSources] = useState<{ id: number; content: string }[]>([]);
   const [confidence, setConfidence] = useState<ConfidenceLevel>('high');
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(true);
 
-  const firestore = useFirestore();
-  const documentsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'documents');
-  }, [firestore]);
-  const { data: documents, isLoading: documentsLoading } = useCollection(documentsQuery);
+  // Load documents from local storage
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        setDocumentsLoading(true);
+        const response = await fetch('/api/documents');
+        if (response.ok) {
+          const docs = await response.json();
+          setDocuments(docs);
+        } else {
+          console.error('Failed to load documents');
+        }
+      } catch (error) {
+        console.error('Error loading documents:', error);
+      } finally {
+        setDocumentsLoading(false);
+      }
+    };
+    
+    loadDocuments();
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -83,17 +99,33 @@ export function ChatView() {
     setSources(mockSources);
 
     try {
-      const response = await citedQuestionAnswering({
-        query: values.query,
-        documents: documentsArray,
-      });
+      // If the user explicitly asks for headings or topic list, use the headings flow
+      const headingKeywords = ['heading', 'headings', 'topic headings', 'topics', 'outline'];
+      const isHeadingRequest = headingKeywords.some(k => values.query.toLowerCase().includes(k));
 
-      const isUncertain = response.answer.toLowerCase().includes("i don't know");
-      setConfidence(isUncertain ? 'low' : 'high');
-      
-      const assistantMessage: Message = { role: 'assistant', content: response.answer };
-      setMessages((prev) => [...prev, assistantMessage]);
-      setAiResponse(response);
+      if (isHeadingRequest) {
+        const headingsResp = await summarizeHeadings({ query: values.query, documents: documentsArray });
+        const content = headingsResp.headings && headingsResp.headings.length > 0
+          ? headingsResp.headings.map(h => `- ${h}`).join('\n')
+          : "No headings could be generated.";
+
+        const assistantMessage: Message = { role: 'assistant', content };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setAiResponse(null);
+        setConfidence('high');
+      } else {
+        const response = await citedQuestionAnswering({
+          query: values.query,
+          documents: documentsArray,
+        });
+
+        const isUncertain = response.answer.toLowerCase().includes("i don't know");
+        setConfidence(isUncertain ? 'low' : 'high');
+        
+        const assistantMessage: Message = { role: 'assistant', content: response.answer };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setAiResponse(response);
+      }
     } catch (error) {
       const errorMessage: Message = {
         role: 'assistant',
@@ -166,13 +198,14 @@ export function ChatView() {
                   <FormItem>
                     <Label>Your Question</Label>
                     <FormControl>
-                      <div className="relative">
-                        <Input placeholder="Ask your question..." {...field} className="pr-12"/>
+                      <div className="relative" suppressHydrationWarning>
+                        <Input placeholder="Ask your question..." {...field} className="pr-12" suppressHydrationWarning/>
                         <Button
                           type="submit"
                           size="icon"
                           className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
                           disabled={isLoading}
+                          suppressHydrationWarning
                         >
                           <Send className="w-4 h-4" />
                         </Button>
