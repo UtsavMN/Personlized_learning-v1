@@ -1,0 +1,33 @@
+mutation AddNewLearningResource($title: String!, $resourceType: String!) @auth(level: USER) {
+  learningResource_insert(data: {
+    title: $title,
+    resourceType: $resourceType,
+    uploaderId_expr: "auth.uid"
+  })
+}
+
+query GetCoursesForInstructor @auth(level: USER) {
+  courses(where: {instructorId: {eq_expr: "auth.uid"}}) {
+    id
+    title
+    courseCode
+    description
+  }
+}
+
+mutation EnrollInCourse($courseId: UUID!) @auth(level: USER) {
+  enrollment_insert(data: {
+    courseId: $courseId,
+    studentId_expr: "auth.uid",
+    enrolledAt_expr: "request.time"
+  })
+}
+
+query ListPublicLearningResources @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  learningResources(where: {courseId: {isNull: true}}) {
+    id
+    title
+    resourceType
+    content
+  }
+}

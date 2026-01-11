@@ -1,8 +1,9 @@
 export const firebaseConfig = {
-  "projectId": "studio-4509763539-a8339",
-  "appId": "1:580436958649:web:fd0e03848570f64bf52a68",
-  "apiKey": "AIzaSyCXHUN34MxtX5dMka87Mc-zRqcG2v0ScPw",
-  "authDomain": "studio-4509763539-a8339.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "580436958649"
+  "apiKey": "AIzaSyBMh6CMMmmKuml9LgzNPUS59jwKu-VfIok",
+  "authDomain": "personlized-learning-c97ce.firebaseapp.com",
+  "projectId": "personlized-learning-c97ce",
+  "storageBucket": "personlized-learning-c97ce.firebasestorage.app",
+  "messagingSenderId": "739172869510",
+  "appId": "1:739172869510:web:1205f60a3909ee8833f807",
+  "measurementId": "G-GTJ91M1F38"
 };
