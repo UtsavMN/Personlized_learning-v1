@@ -38,7 +38,7 @@ export function GradePredictorView() {
                 labels: [0.95, 0.40, 0.65, 0.85, 0.20]
             };
 
-            await gradePredictor.train(trainingData);
+            await gradePredictor.train({ ...trainingData, inputs: trainingData.inputs as any });
             await gradePredictor.save();
 
             toast({ title: "Training Complete!", description: "Model updated and saved locally." });

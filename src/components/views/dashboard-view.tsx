@@ -1,3 +1,4 @@
+'use client';
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Brain, Flame, Clock, BookOpen, ArrowUpRight, Target } from "lucide-react";
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { Button } from '@/components/ui/button';
+import { AIRecommendationsWidget } from '../widgets/ai-recommendations';
 
 export function DashboardView() {
     const { user } = useLocalAuth();
@@ -20,6 +22,8 @@ export function DashboardView() {
     );
 
     const masteryItems = useLiveQuery(() => db.subjectMastery.toArray());
+    const totalXp = masteryItems?.reduce((sum, item) => sum + (item.xp || 0), 0) || 0;
+
     if (profile === undefined) return <div className="p-8 flex items-center justify-center animate-pulse">Loading Profile...</div>;
     if (profile === null) return (
         <div className="h-full flex flex-col items-center justify-center p-4">
@@ -30,52 +34,68 @@ export function DashboardView() {
     return (
         <div className="space-y-6 animate-in fade-in duration-500 p-2">
             {/* Hero Section */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 to-primary/60 p-8 text-primary-foreground shadow-lg">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 p-8 text-white shadow-xl">
                 <div className="relative z-10">
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">
-                        Welcome back, {user?.displayName?.split(' ')[0] || profile.name.split(' ')[0]}! 👋
+                    <div className="flex items-center gap-2 mb-2 opacity-90">
+                        <Brain className="w-5 h-5" />
+                        <span className="text-sm font-medium tracking-wide uppercase">Student Dashboard</span>
+                    </div>
+                    <h1 className="text-4xl font-bold tracking-tight mb-4">
+                        Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'},
+                        <span className="ml-2 text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">
+                            {user?.displayName?.split(' ')[0] || profile.name.split(' ')[0]}
+                        </span>
                     </h1>
-                    <p className="text-primary-foreground/90 max-w-xl">
-                        You have <span className="font-bold bg-white/20 px-2 py-0.5 rounded text-white">{profile.availableHoursPerWeek} hours</span> available this week.
-                        {masteryItems && masteryItems.length > 0 ? (
-                            <span> Keep consistent to maintain your streak!</span>
-                        ) : (
-                            <span> Complete your onboarding to get personalized recs.</span>
-                        )}
-                    </p>
+
+                    <div className="flex flex-wrap gap-4 mt-6">
+                        <div className="bg-white/10 backdrop-blur-md rounded-lg p-3 border border-white/20">
+                            <p className="text-xs text-blue-100 uppercase tracking-widest font-semibold">Weekly Goal</p>
+                            <p className="text-2xl font-bold">{profile.availableHoursPerWeek} hrs</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-md rounded-lg p-3 border border-white/20">
+                            <p className="text-xs text-blue-100 uppercase tracking-widest font-semibold">Streak</p>
+                            <div className="flex items-center gap-2">
+                                <Flame className="w-5 h-5 text-orange-400 fill-orange-400" />
+                                <p className="text-2xl font-bold">{profile.metrics.streak}</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                {/* Decorative background circle */}
-                <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+
+                {/* Decorative background effects */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl transform -translate-x-1/2 translate-y-1/2" />
             </div>
 
             {/* Stats Grid */}
+            {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatsCard
-                    title="Daily Streak"
-                    value={`${profile.metrics.streak} Days`}
-                    icon={Flame}
-                    color="text-orange-500"
-                    trend="Keep it up!"
+                    title="Total XP"
+                    value={totalXp}
+                    icon={Brain}
+                    color="text-purple-500 bg-purple-100 dark:bg-purple-900/30"
+                    trend="Lifetime gained"
                 />
                 <StatsCard
-                    title="Total XP"
-                    value={profile.stats?.totalXp || 0}
-                    icon={Brain}
-                    color="text-purple-500"
-                    trend="Lifetime gained"
+                    title="Focus Time"
+                    value={Math.round(totalXp / 10) + "m"} // Simplified mock
+                    icon={Clock}
+                    color="text-blue-500 bg-blue-100 dark:bg-blue-900/30"
+                    trend="This Week"
                 />
                 <StatsCard
                     title="Topics Mastered"
                     value={masteryItems?.filter(i => i.masteryScore > 80).length || 0}
                     icon={Target}
-                    color="text-green-500"
+                    color="text-green-500 bg-green-100 dark:bg-green-900/30"
                     trend="Score > 80%"
                 />
                 <StatsCard
                     title="Active Subjects"
                     value={masteryItems?.length || 0}
                     icon={BookOpen}
-                    color="text-blue-500"
+                    color="text-pink-500 bg-pink-100 dark:bg-pink-900/30"
                     trend="Currently tracking"
                 />
             </div>
@@ -118,49 +138,9 @@ export function DashboardView() {
                     </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-muted/60">
-                    <CardHeader>
-                        <CardTitle>Recommended Actions</CardTitle>
-                        <CardDescription>Based on your recent activity</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {masteryItems && masteryItems.length > 0 ? (
-                                masteryItems
-                                    .filter(m => m.masteryScore < 50)
-                                    .slice(0, 2)
-                                    .map(m => (
-                                        <ActionItem
-                                            key={m.id}
-                                            title={`Review ${m.topicId}`}
-                                            desc={`Score is ${m.masteryScore}%. Time to practice!`}
-                                            type="urgent"
-                                        />
-                                    ))
-                            ) : (
-                                <ActionItem
-                                    title="Complete Onboarding"
-                                    desc="Add subjects to get recommendations."
-                                    type="normal"
-                                />
-                            )}
-
-                            {masteryItems && masteryItems.length > 0 && masteryItems.every(m => m.masteryScore >= 50) && (
-                                <ActionItem
-                                    title="Maintain Streak"
-                                    desc="You're doing great! Keep reviewing."
-                                    type="normal"
-                                />
-                            )}
-
-                            <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col gap-2 items-center text-center mt-4">
-                                <h4 className="font-semibold text-sm text-primary">Ready for a workout?</h4>
-                                <p className="text-xs text-muted-foreground">Take a quick 5-min quiz.</p>
-                                <Button size="sm" className="w-full mt-1">Start Quiz</Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                <div className="h-full">
+                    <AIRecommendationsWidget />
+                </div>
             </div>
 
             <div className="grid grid-cols-1">
@@ -233,17 +213,19 @@ function StudyPlanWidget() {
     );
 }
 
+
 function StatsCard({ title, value, icon: Icon, color, trend }: any) {
     return (
-        <Card className="shadow-sm border-muted/60 hover:shadow-md transition-all">
+        <Card className="shadow-sm border-muted/40 hover:shadow-md transition-all hover:border-sidebar-primary/50 group">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-                <Icon className={`h-4 w-4 ${color}`} />
+                <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">{title}</CardTitle>
+                <div className={`p-2 rounded-lg ${color}`}>
+                    <Icon className="h-4 w-4" />
+                </div>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
+                <div className="text-2xl font-bold tracking-tight">{value}</div>
                 <p className="text-xs text-muted-foreground flex items-center mt-1">
-                    {trend.includes('+') ? <ArrowUpRight className="w-3 h-3 mr-1 text-green-500" /> : null}
                     {trend}
                 </p>
             </CardContent>

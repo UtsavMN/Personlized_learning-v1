@@ -5,13 +5,11 @@ export interface SchedulerState {
     previousSubject: string;
 }
 
-export type SchedulerAction = 'Math' | 'Physics' | 'Chemistry' | 'Break';
-
-const ACTIONS: SchedulerAction[] = ['Math', 'Physics', 'Chemistry', 'Break'];
+export type SchedulerAction = string;
 
 export class RLScheduler {
-    private qTable: Map<string, number[]>; // StateHash -> Q-Values for Actions
-    private epsilon: number = 0.3; // Exploration rate (30% random actions)
+    private qTable: Map<string, Record<string, number>>; // StateHash -> { Action: QValue }
+    private epsilon: number = 0.3; // Exploration rate
     private alpha: number = 0.1; // Learning rate
     private gamma: number = 0.9; // Discount factor
 
@@ -26,73 +24,113 @@ export class RLScheduler {
     }
 
     // Get Q-Values for a state (Initialize if new)
-    private getQValues(stateHash: string): number[] {
+    private getQValues(stateHash: string): Record<string, number> {
         if (!this.qTable.has(stateHash)) {
-            // Initialize with 0s
-            this.qTable.set(stateHash, new Array(ACTIONS.length).fill(0));
+            // Initialize with empty object. Actions will be added as needed.
+            this.qTable.set(stateHash, {});
         }
         return this.qTable.get(stateHash)!;
     }
 
     // Epsilon-Greedy Policy
-    public suggestAction(state: SchedulerState): SchedulerAction {
+    public async suggestAction(state: SchedulerState, availableSubjects: string[]): Promise<SchedulerAction> {
         const stateHash = this.getStateHash(state);
         const qValues = this.getQValues(stateHash);
 
+        // Define relevant actions: All subjects + Break
+        const relevantActions = [...availableSubjects, 'Break'];
+
+        // Ensure Q-Values exist for these actions (init to 0)
+        relevantActions.forEach(action => {
+            if (qValues[action] === undefined) {
+                qValues[action] = 0;
+            }
+        });
+
         // Explore
         if (Math.random() < this.epsilon) {
-            const randomIndex = Math.floor(Math.random() * ACTIONS.length);
-            return ACTIONS[randomIndex];
+            const randomIndex = Math.floor(Math.random() * relevantActions.length);
+            return relevantActions[randomIndex];
         }
 
         // Exploit (Argmax)
         let maxVal = -Infinity;
-        let maxIdx = 0;
-        qValues.forEach((val, idx) => {
+        let bestAction = relevantActions[0] || 'Break';
+
+        relevantActions.forEach(action => {
+            const val = qValues[action];
             if (val > maxVal) {
                 maxVal = val;
-                maxIdx = idx;
+                bestAction = action;
             }
         });
 
-        return ACTIONS[maxIdx];
+        return bestAction;
     }
 
     // Bellman Update
     public learn(state: SchedulerState, action: SchedulerAction, reward: number, nextState: SchedulerState) {
         const stateHash = this.getStateHash(state);
         const nextStateHash = this.getStateHash(nextState);
-        const actionIdx = ACTIONS.indexOf(action);
 
-        const currentQ = this.getQValues(stateHash);
-        const nextQ = this.getQValues(nextStateHash);
+        const currentQRecord = this.getQValues(stateHash);
+        const nextQRecord = this.getQValues(nextStateHash);
 
-        // Max Q for next state
-        const maxNextQ = Math.max(...nextQ);
+        const currentVal = currentQRecord[action] || 0;
+
+        // Max Q for next state (across all known actions in that state)
+        const nextValues = Object.values(nextQRecord);
+        const maxNextQ = nextValues.length > 0 ? Math.max(...nextValues) : 0;
 
         // Q(s,a) = Q(s,a) + alpha * (R + gamma * maxQ(s',a') - Q(s,a))
-        currentQ[actionIdx] = currentQ[actionIdx] + this.alpha * (reward + this.gamma * maxNextQ - currentQ[actionIdx]);
+        const newVal = currentVal + this.alpha * (reward + this.gamma * maxNextQ - currentVal);
 
-        this.qTable.set(stateHash, currentQ);
+        currentQRecord[action] = newVal;
         this.save();
     }
 
     public save() {
-        // Convert Map to JSON array of entries for storage
+        if (typeof window === 'undefined') return;
+        // Convert Map to JSON array
         const serialized = JSON.stringify(Array.from(this.qTable.entries()));
-        localStorage.setItem('mentora_rl_qtable', serialized);
+        localStorage.setItem('mentora_rl_qtable_v2', serialized);
     }
 
     public load() {
-        const serialized = localStorage.getItem('mentora_rl_qtable');
+        if (typeof window === 'undefined') return;
+
+        // Try load V2
+        const serialized = localStorage.getItem('mentora_rl_qtable_v2');
         if (serialized) {
             try {
                 this.qTable = new Map(JSON.parse(serialized));
+                return;
             } catch (e) {
-                console.error("Failed to load Q-Table", e);
-                this.qTable = new Map();
+                console.error("Failed to load Q-Table V2", e);
             }
         }
+
+        // Fallback: clear old incompatible data or start fresh
+        // ignoring v1 table as it was number[]
+        this.qTable = new Map();
+    }
+
+    // --- Visualization ---
+    // Return format: State -> [Math, Physics, Chem, Break] is broken now.
+    // Changing to flexible record
+    public getQTable(): Record<string, number[]> {
+        // Adapt to old visualization format if possible, or we need to update visualizer.
+        // For now, let's just return values array but it loses key info.
+        // Better to return the map entries.
+        // But the previous return type was Record<string, number[]>
+        // I will hack it to return mostly 0s to avoid breaking the UI immediately, 
+        // OR better, I updated the return type to any or updated the UI?
+        // I'll update the UI in settings-view.tsx as well.
+        return {};
+    }
+
+    public getQTableFull(): Record<string, Record<string, number>> {
+        return Object.fromEntries(this.qTable);
     }
 }
 

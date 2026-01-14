@@ -29,9 +29,11 @@ import {
     Settings,
     Brain,
     TrendingUp,
-    BrainCircuit
+    BrainCircuit,
+    Sparkles,
+    CircleHelp
 } from 'lucide-react';
-import { UserButton } from "@clerk/nextjs";
+
 import { useLocalAuth } from '@/lib/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -59,7 +61,7 @@ export function AppSidebar({
         {
             label: "Practice",
             items: [
-                { title: 'The Gym', icon: Dumbbell, value: 'gym' },
+                { title: 'Quiz', icon: CircleHelp, value: 'quiz' },
                 { title: 'Math Solver', icon: Calculator, value: 'math' },
                 { title: 'Code Lab', icon: Code2, value: 'code' },
                 { title: 'Pulse', icon: Brain, value: 'flashcards' },
@@ -77,15 +79,15 @@ export function AppSidebar({
     ];
 
     return (
-        <Sidebar collapsible="icon">
+        <Sidebar collapsible="icon" >
             <SidebarHeader>
                 <div className="flex items-center gap-2 px-4 py-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                        <GraduationCap className="size-5" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-purple-600 to-blue-600 text-white">
+                        <Sparkles className="size-5" />
                     </div>
                     <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                        <span className="truncate font-semibold">NIE Guide</span>
-                        <span className="truncate text-xs">Campus Assistant</span>
+                        <span className="truncate font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Mentora</span>
+                        <span className="truncate text-xs text-muted-foreground">Campus Assistant</span>
                     </div>
                 </div>
             </SidebarHeader>
@@ -119,36 +121,27 @@ export function AppSidebar({
                     <GamificationStats />
                     <div className="p-4 flex items-center gap-3">
                         {/* In Dev Mode, show local avatar. In Prod, show Clerk. */}
-                        {user?.uid === 'dev_utsav' ? (
+                        {user ? (
                             <div className="flex items-center gap-2">
-                                <img src={user.photoURL || ""} className="w-8 h-8 rounded-full bg-muted" />
-                                <div className="text-xs">
-                                    <p className="font-semibold">{user.displayName}</p>
-                                    <p className="text-muted-foreground">Dev Mode</p>
+                                <Avatar className="h-8 w-8">
+                                    <AvatarImage src={user.photoURL || ""} />
+                                    <AvatarFallback>{user.displayName?.charAt(0) || "U"}</AvatarFallback>
+                                </Avatar>
+                                <div className="text-xs group-data-[collapsible=icon]:hidden">
+                                    <p className="font-semibold truncate max-w-[120px]">{user.displayName}</p>
+                                    <p className="text-muted-foreground">Student</p>
                                 </div>
                             </div>
                         ) : (
-                            <SignedIn>
-                                <UserButton
-                                    showName={true}
-                                    appearance={{
-                                        elements: {
-                                            userButtonBox: "flex flex-row-reverse",
-                                            userButtonOuterIdentifier: "font-semibold text-sm truncate pl-2",
-                                            avatarBox: "h-9 w-9"
-                                        }
-                                    }}
-                                />
-                                <div className="text-xs text-muted-foreground">
-                                    {user?.displayName}
-                                </div>
-                            </SignedIn>
+                            <div className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                                Guest Mode
+                            </div>
                         )}
                     </div>
                 </SidebarMenu>
             </SidebarFooter>
             <SidebarRail />
-        </Sidebar>
+        </Sidebar >
     );
 }
 

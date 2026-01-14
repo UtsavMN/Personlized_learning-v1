@@ -3,9 +3,10 @@
 import { useLocalAuth } from '@/lib/auth-context';
 import { FactoryResetWidget } from '@/components/factory-reset';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, ShieldAlert, Mail, Plus, X, Save, Target } from 'lucide-react';
+import { User, ShieldAlert, Mail, Plus, X, Save, Target, Brain } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { db } from '@/lib/db';
+import { cn, generateTopicId } from '@/lib/utils';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,19 @@ export function SettingsView() {
                 <ProfileEditor />
 
                 {/* Data Zone */}
+                <Card className="border-muted/60">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Brain className="w-5 h-5 text-purple-500" />
+                            Brain Inspector
+                        </CardTitle>
+                        <CardDescription>Visualize the internal state of your AI agents.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <BrainInspector />
+                    </CardContent>
+                </Card>
+
                 <Card className="border-destructive/20 bg-destructive/5">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-destructive">
@@ -106,7 +120,7 @@ function ProfileEditor() {
     const handleAddSubject = async () => {
         if (!newSubject.trim()) return;
         const sub = newSubject.trim();
-        const id = sub.toLowerCase().replace(/[^a-z0-9]+/g, '-'); // Cleaner ID generation
+        const id = generateTopicId(sub);
 
         // Check duplicate (case insensitive check on topicId)
         const exists = await db.subjectMastery.where('topicId').equals(id).count();
@@ -242,3 +256,56 @@ function ProfileEditor() {
         </Card>
     );
 }
+
+
+function BrainInspector() {
+    // StateHash -> { Action: Value }
+    const [qTable, setQTable] = useState<Record<string, Record<string, number>>>({});
+    const [refresh, setRefresh] = useState(0);
+
+    useEffect(() => {
+        // Dynamic import to avoid SSR issues if any (though this component is client-only)
+        import('@/lib/ai/rl-scheduler').then(({ rlScheduler }) => {
+            setQTable(rlScheduler.getQTableFull());
+        });
+    }, [refresh]);
+
+    const items = Object.entries(qTable);
+
+    return (
+        <div className="space-y-4">
+            <div className="flex justify-between items-center">
+                <div className="text-sm text-muted-foreground">
+                    <span className="font-bold text-foreground">{items.length}</span> States Learned
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setRefresh(prev => prev + 1)}>Refresh Data</Button>
+            </div>
+
+            <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-lg p-2 bg-muted/20">
+                {items.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                        No learning data yet. Complete a study session!
+                    </div>
+                ) : (
+                    items.map(([state, actions], i) => (
+                        <div key={i} className="text-xs font-mono p-2 bg-card border rounded shadow-sm">
+                            <div className="font-semibold mb-1 text-primary">{state}</div>
+                            <div className="grid grid-cols-2 gap-1">
+                                {Object.entries(actions).map(([action, value]) => (
+                                    <div key={action} title={action} className="flex justify-between px-1 bg-muted/50 rounded">
+                                        <span>{action.substring(0, 4)}:</span>
+                                        <span>{value?.toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+            <p className="text-[10px] text-muted-foreground text-right">
+                Values represent expected reward (Q-Value).
+            </p>
+        </div>
+    );
+}
+

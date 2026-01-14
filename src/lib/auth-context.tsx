@@ -38,6 +38,8 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
 
     const USE_DEV_AUTH = true; // TOGGLE THIS FOR DEV MODE
 
+    const [isDevLoading, setIsDevLoading] = useState(true);
+
     useEffect(() => {
         const syncUser = async () => {
             if (USE_DEV_AUTH) {
@@ -58,6 +60,8 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
                     setNeedsOnboarding(!profile);
                 } catch (e) {
                     console.error("Dev Profile check failed", e);
+                } finally {
+                    setIsDevLoading(false);
                 }
                 return;
             }
@@ -111,8 +115,10 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
         await signOut();
     }
 
+    const effectiveLoading = USE_DEV_AUTH ? isDevLoading : !isLoaded;
+
     return (
-        <AuthContext.Provider value={{ user, isUserLoading: !isLoaded, login, register, logout, needsOnboarding }}>
+        <AuthContext.Provider value={{ user, isUserLoading: effectiveLoading, login, register, logout, needsOnboarding }}>
             {children}
         </AuthContext.Provider>
     );

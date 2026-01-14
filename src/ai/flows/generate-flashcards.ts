@@ -21,7 +21,7 @@ export const generateFlashcardsFlow = ai.defineFlow(
         inputSchema: GenerateFlashcardsInput,
         outputSchema: GenerateFlashcardsOutput,
     },
-    async (input) => {
+    async (input: z.infer<typeof GenerateFlashcardsInput>) => {
         const { context, numCards } = input;
 
         const prompt = `

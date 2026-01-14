@@ -57,7 +57,8 @@ export default function Dashboard() {
       case 'documents': return <DocumentView />;
       case 'chat': return <ChatView />;
       case 'math': return <MathView />;
-      case 'gym': return <QuizView />;
+      case 'math': return <MathView />;
+      case 'quiz': return <QuizView />;
       case 'flashcards': return <FlashcardsView />;
       case 'code': return <CodeView />;
       case 'predictor': return <GradePredictorView />;
@@ -74,7 +75,7 @@ export default function Dashboard() {
       documents: 'Documents',
       chat: 'AI Tutor',
       math: 'Math Solver',
-      gym: 'The Gym',
+      quiz: 'Quiz',
       flashcards: 'Pulse (Flashcards)',
       predictor: 'Grade Predictor (Neuro)',
       'rl-agent': 'Smart Scheduler (Q-Learning)',
@@ -91,6 +92,10 @@ export default function Dashboard() {
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
+          <div className="flex items-center gap-2 mr-4">
+            <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500">Mentora</span>
+          </div>
+          <Separator orientation="vertical" className="mr-2 h-4 hidden md:block" />
           <h2 className="text-lg font-semibold">{getPageTitle(activeTab)}</h2>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">

@@ -2,7 +2,7 @@ import * as tf from '@tensorflow/tfjs';
 
 // Input Feature Vector (Normalized 0-1)
 // [AVG_QUIZ_SCORE, STUDY_HOURS_THIS_WEEK, COMPLETED_TASKS_COUNT, SUBJECT_DIFFICULTY]
-type InputVector = [number, number, number, number];
+export type InputVector = [number, number, number, number];
 
 export class GradePredictor {
     private model: tf.Sequential;
@@ -64,10 +64,12 @@ export class GradePredictor {
     }
 
     async save() {
+        if (typeof window === 'undefined') return;
         await this.model.save('localstorage://grade-predictor-model');
     }
 
     async load() {
+        if (typeof window === 'undefined') return;
         try {
             this.model = await tf.loadLayersModel('localstorage://grade-predictor-model') as tf.Sequential;
             this.model.compile({ optimizer: 'adam', loss: 'meanSquaredError' });
@@ -77,4 +79,9 @@ export class GradePredictor {
     }
 }
 
-export const gradePredictor = new GradePredictor();
+// Singleton Pattern for HMR support
+const globalForGradePredictor = globalThis as unknown as { gradePredictor: GradePredictor | undefined };
+
+export const gradePredictor = globalForGradePredictor.gradePredictor ?? new GradePredictor();
+
+if (process.env.NODE_ENV !== 'production') globalForGradePredictor.gradePredictor = gradePredictor;

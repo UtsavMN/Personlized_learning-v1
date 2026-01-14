@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useLocalAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
+import { generateTopicId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -66,7 +67,7 @@ export function OnboardingView() {
 
             // 1. Create Learner Profile
             await db.learnerProfile.put({
-                id: user.uid,
+
                 userId: user.uid, // Required by index
                 name: user.displayName || 'Student',
                 learningStyle: 'visual', // Default, can be refined later
@@ -81,7 +82,8 @@ export function OnboardingView() {
 
             // 2. Initialize Subject Mastery (Strictly 0)
             const masteryEntries = validSubjects.map(sub => ({
-                topicId: sub.toLowerCase().replace(/\s+/g, '-'), // Use safe ID
+
+                topicId: generateTopicId(sub),
                 subject: sub.trim(),
                 masteryScore: 0,
                 confidenceScore: 0,

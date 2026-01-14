@@ -13,12 +13,14 @@ export async function trackEvent(
             userId: 'local-user', // Single user mode for now
             eventType,
             timestamp: Date.now(),
-            topicId: payload.topicId,
-            documentId: payload.documentId,
-            data: payload.data
+            topicId: payload.topicId || 'general',
+            documentId: payload.documentId || undefined,
+            data: payload.data || {}
         };
 
-        await db.analytics.add(event);
+        if (payload.topicId) event.topicId = payload.topicId;
+
+        await db.analytics.add(event as AnalyticsEvent);
         console.log(`[Analytics] ${eventType}`, payload);
     } catch (error) {
         console.warn('Failed to log analytics event:', error);

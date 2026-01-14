@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 
-interface TimetableEntry {
+export interface TimetableEntry {
     id: number;
     day: string; // 'Monday', 'Tuesday', etc.
     startTime: string; // '09:00'
@@ -10,7 +10,7 @@ interface TimetableEntry {
     type?: 'Lecture' | 'Lab' | 'Tutorial' | 'Other';
 }
 
-interface DocumentEntry {
+export interface DocumentEntry {
     id: number;
     title: string;
     description: string;
@@ -22,7 +22,7 @@ interface DocumentEntry {
     type: string;
 }
 
-interface ChatMessageEntry {
+export interface ChatMessageEntry {
     id?: number;
     role: 'user' | 'assistant';
     content: string;
@@ -30,7 +30,7 @@ interface ChatMessageEntry {
     documentId?: number; // Linked to a specific document context if applicable
 }
 
-interface LearnerProfile {
+export interface LearnerProfile {
     id: number;
     userId: string; // 'U000'
     name: string;
@@ -44,7 +44,7 @@ interface LearnerProfile {
     };
 }
 
-interface SubjectMastery {
+export interface SubjectMastery {
     id?: number;
     topicId: string; // 'limits'
     subject: string; // 'Math'
@@ -56,7 +56,7 @@ interface SubjectMastery {
     nextReviewDate: Date;
 }
 
-interface TaskEntry {
+export interface TaskEntry {
     id?: number;
     title: string;
     completed: boolean;
@@ -64,7 +64,7 @@ interface TaskEntry {
     type: 'task';
 }
 
-interface HobbyEntry {
+export interface HobbyEntry {
     id?: number;
     name: string; // "Guitar"
     frequency: 'daily' | 'weekly';
@@ -73,7 +73,7 @@ interface HobbyEntry {
     type: 'hobby';
 }
 
-interface QuestionEntry {
+export interface QuestionEntry {
     id?: number;
     topicId: string; // 'limits'
     difficulty: 'easy' | 'medium' | 'hard';
@@ -85,7 +85,7 @@ interface QuestionEntry {
     documentId?: number; // Linked if source is document
 }
 
-interface QuizResultEntry {
+export interface QuizResultEntry {
     id?: number;
     topic: string; // "Physics - Kinematics"
     score: number; // Percentage
@@ -102,6 +102,35 @@ export interface VectorEntry {
     vector: number[]; // 384-dimensional embedding
     pageNumber?: number;
     segmentId: number;
+}
+
+export interface Deck {
+    id?: number;
+    title: string;
+    subject: string;
+    documentId?: string;
+    createdAt: number;
+}
+
+export interface Flashcard {
+    id?: number;
+    deckId: number;
+    front: string;
+    back: string;
+    interval: number;
+    repetition: number;
+    easeFactor: number;
+    nextReview: number;
+}
+
+export interface AnalyticsEvent {
+    id?: number;
+    userId?: string;
+    eventType: string;
+    timestamp: number;
+    topicId: string;
+    documentId?: string;
+    data: any;
 }
 
 // --- Database Definition ---
@@ -144,12 +173,12 @@ export class AppDatabase extends Dexie {
             flashcardDecks: '++id, documentId, subject',
             flashcards: '++id, deckId, nextReview'
         });
-    });
+
 
         // Version 6: Vector Embeddings
         this.version(6).stores({
-        embeddings: '++id, documentId, segmentId'
-    });
+            embeddings: '++id, documentId, segmentId'
+        });
     }
 }
 

@@ -70,8 +70,8 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-3">
             <GraduationCap className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold font-headline text-foreground">
-              NIE Campus Guide
+            <h1 className="text-2xl font-bold font-headline bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+              Mentora
             </h1>
           </div>
           <UserNav />

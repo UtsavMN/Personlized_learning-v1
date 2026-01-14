@@ -5,8 +5,8 @@ import { LocalAuthProvider } from '@/lib/auth-context';
 import { DevTools } from '@/components/dev-tools';
 
 export const metadata: Metadata = {
-  title: 'NIE Campus Guide',
-  description: 'A citation-grounded campus assistant for NIE Mysore.',
+  title: 'Mentora',
+  description: 'Your personalized learning assistant.',
 };
 
 import { ClerkProvider } from '@clerk/nextjs';
