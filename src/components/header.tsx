@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth, useUser } from '@/firebase';
+import { useLocalAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -11,46 +11,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { GraduationCap, LogIn, LogOut, AlertCircle } from 'lucide-react';
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { GraduationCap, LogIn, LogOut } from 'lucide-react';
 import { useState } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 function UserNav() {
-  const auth = useAuth();
-  const { user, isUserLoading } = useUser();
-  const [authError, setAuthError] = useState<string | null>(null);
+  const { user, isUserLoading, logout } = useLocalAuth();
 
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      setAuthError(null);
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      const errorCode = error?.code;
-      const errorMessage = error?.message || 'Unknown error';
-      
-      if (errorCode === 'auth/configuration-not-found') {
-        setAuthError('Firebase authentication is not configured. Please see FIREBASE_AUTH_SETUP.md for setup instructions.');
-      } else if (errorCode === 'auth/popup-blocked') {
-        setAuthError('Login popup was blocked. Please allow popups and try again.');
-      } else if (errorCode === 'auth/operation-not-supported-in-this-environment') {
-        setAuthError('Google Sign-In is not available in this environment.');
-      } else {
-        setAuthError(`Login error: ${errorMessage}`);
-      }
-      
-      console.error('Error signing in with Google:', error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      setAuthError(null);
-      await signOut(auth);
-    } catch (error) {
-      console.error('Error signing out', error);
-    }
+  const handleLogout = () => {
+    logout();
   };
 
   if (isUserLoading) {
@@ -60,15 +28,9 @@ function UserNav() {
   if (!user) {
     return (
       <div className="flex flex-col items-end gap-2">
-        {authError && (
-          <Alert variant="destructive" className="mb-2 w-80">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{authError}</AlertDescription>
-          </Alert>
-        )}
-        <Button onClick={handleLogin}>
+        <Button onClick={() => window.location.reload()}>
           <LogIn className="mr-2 h-4 w-4" />
-          Login with Google
+          Login
         </Button>
       </div>
     );

@@ -8,8 +8,9 @@
  * - CitedQuestionAnsweringOutput - The return type for the citedQuestionAnswering function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import { runWithRetry } from '@/ai/retry';
 
 const CitedQuestionAnsweringInputSchema = z.object({
   query: z.string().describe('The question to answer.'),
@@ -37,8 +38,8 @@ export async function citedQuestionAnswering(input: CitedQuestionAnsweringInput)
 
 const prompt = ai.definePrompt({
   name: 'citedQuestionAnsweringPrompt',
-  input: {schema: CitedQuestionAnsweringInputSchema},
-  output: {schema: CitedQuestionAnsweringOutputSchema},
+  input: { schema: CitedQuestionAnsweringInputSchema },
+  output: { schema: CitedQuestionAnsweringOutputSchema },
   prompt: `You are an AI assistant that answers questions based on the provided documents. 
 
 IMPORTANT: Format your response as follows:
@@ -73,8 +74,8 @@ const citedQuestionAnsweringFlow = ai.defineFlow(
     inputSchema: CitedQuestionAnsweringInputSchema,
     outputSchema: CitedQuestionAnsweringOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input: any) => {
+    const result = await runWithRetry(() => prompt(input)) as any;
+    return result.output as CitedQuestionAnsweringOutput;
   }
 );

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { citedQuestionAnswering, type CitedQuestionAnsweringOutput } from '@/ai/flows/cited-question-answering';
 import { summarizeHeadings } from '@/ai/flows/summarize-headings';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RightPanel } from '@/components/right-panel';
 import { ChatMessage } from '@/components/chat-message';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, Trash2 } from 'lucide-react';
 import type { ConfidenceLevel } from '../confidence-meter';
 import {
   Select,
@@ -30,41 +32,15 @@ const formSchema = z.object({
   documentId: z.string().min(1, 'Please select a document.'),
 });
 
-type Message = {
-  role: 'user' | 'assistant';
-  content: string;
-};
-
 export function ChatView() {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [aiResponse, setAiResponse] = useState<CitedQuestionAnsweringOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [sources, setSources] = useState<{ id: number; content: string }[]>([]);
   const [confidence, setConfidence] = useState<ConfidenceLevel>('high');
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [documentsLoading, setDocumentsLoading] = useState(true);
 
-  // Load documents from local storage
-  useEffect(() => {
-    const loadDocuments = async () => {
-      try {
-        setDocumentsLoading(true);
-        const response = await fetch('/api/documents');
-        if (response.ok) {
-          const docs = await response.json();
-          setDocuments(docs);
-        } else {
-          console.error('Failed to load documents');
-        }
-      } catch (error) {
-        console.error('Error loading documents:', error);
-      } finally {
-        setDocumentsLoading(false);
-      }
-    };
-    
-    loadDocuments();
-  }, []);
+  // Load documents and messages from local storage
+  const documents = useLiveQuery(() => db.documents.toArray());
+  const messages = useLiveQuery(() => db.chatHistory.orderBy('createdAt').toArray());
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -74,82 +50,126 @@ export function ChatView() {
     },
   });
 
+  const clearChat = async () => {
+    await db.chatHistory.clear();
+    setSources([]);
+    setAiResponse(null);
+  }
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setAiResponse(null);
 
-    const userMessage: Message = { role: 'user', content: values.query };
-    setMessages((prev) => [...prev, userMessage]);
+    // 1. Save User Message
+    await db.chatHistory.add({
+      role: 'user',
+      content: values.query,
+      createdAt: new Date(),
+      documentId: Number(values.documentId)
+    });
 
-    const selectedDocument = documents?.find(doc => doc.id === values.documentId);
+    const selectedDocument = documents?.find(doc => doc.id === Number(values.documentId));
 
     if (!selectedDocument) {
-      const errorMessage: Message = {
+      await db.chatHistory.add({
         role: 'assistant',
         content: 'Could not find the selected document.',
-      };
-      setMessages(prev => [...prev, errorMessage]);
+        createdAt: new Date()
+      });
       setIsLoading(false);
       return;
     }
-    
-    const documentsArray = [selectedDocument.content];
-    
+
+    // Use the extracted content from Dexie
+    // Truncate to avoid hitting token limits (approx 20k chars per doc)
+    const MAX_SHARD_SIZE = 20000;
+    const rawContent = selectedDocument.content || "";
+    const truncatedContent = rawContent.length > MAX_SHARD_SIZE
+      ? rawContent.substring(0, MAX_SHARD_SIZE) + "\n...[Content Truncated due to size limits]"
+      : rawContent;
+
+    const documentsArray = [truncatedContent];
+
+    // For UI simplicity in this version, sources are just the full doc content
     const mockSources = documentsArray.map((doc, index) => ({ id: index + 1, content: doc }));
     setSources(mockSources);
 
     try {
-      // If the user explicitly asks for headings or topic list, use the headings flow
       const headingKeywords = ['heading', 'headings', 'topic headings', 'topics', 'outline'];
       const isHeadingRequest = headingKeywords.some(k => values.query.toLowerCase().includes(k));
+      let answer = "";
 
       if (isHeadingRequest) {
         const headingsResp = await summarizeHeadings({ query: values.query, documents: documentsArray });
         const content = headingsResp.headings && headingsResp.headings.length > 0
-          ? headingsResp.headings.map(h => `- ${h}`).join('\n')
+          ? headingsResp.headings.map((h: string) => `- ${h}`).join('\n')
           : "No headings could be generated.";
 
-        const assistantMessage: Message = { role: 'assistant', content };
-        setMessages((prev) => [...prev, assistantMessage]);
-        setAiResponse(null);
-        setConfidence('high');
+        answer = content;
+
       } else {
-        const response = await citedQuestionAnswering({
-          query: values.query,
-          documents: documentsArray,
+        // Direct API call to our new route
+        const apiResponse = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: values.query,
+            documents: documentsArray,
+          }),
         });
+
+        if (!apiResponse.ok) {
+          const err = await apiResponse.json().catch(() => ({}));
+          throw new Error(err.error || `Server Error: ${apiResponse.statusText}`);
+        }
+
+        const response = await apiResponse.json();
 
         const isUncertain = response.answer.toLowerCase().includes("i don't know");
         setConfidence(isUncertain ? 'low' : 'high');
-        
-        const assistantMessage: Message = { role: 'assistant', content: response.answer };
-        setMessages((prev) => [...prev, assistantMessage]);
         setAiResponse(response);
+        answer = response.answer;
       }
-    } catch (error) {
-      const errorMessage: Message = {
+
+      // 2. Save Assistant Message
+      await db.chatHistory.add({
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+        content: answer,
+        createdAt: new Date(),
+        documentId: Number(values.documentId)
+      });
+
+    } catch (error: any) {
+      console.error("Chat Error:", error);
+      await db.chatHistory.add({
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${error.message || 'Unknown error'}. Please check if your API key is configured correctly.`,
+        createdAt: new Date()
+      });
       setConfidence('low');
-      console.error(error);
     } finally {
       setIsLoading(false);
+      form.setValue('query', ''); // Clear input
     }
   }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 h-full">
       <Card className="lg:col-span-2 h-full flex flex-col shadow-lg">
-        <CardHeader>
-          <CardTitle className="font-headline">Cited Question Answering</CardTitle>
-          <CardDescription>Ask a question based on one of the available documents. The AI will answer and cite its sources.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="flex flex-col space-y-1.5">
+            <CardTitle className="font-headline">Cited Question Answering</CardTitle>
+            <CardDescription>Ask a question based on your local documents.</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={clearChat}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Clear Chat
+          </Button>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col gap-4">
           <ScrollArea className="flex-grow pr-4 -mr-4 h-96 border rounded-md p-4">
             <div className="space-y-4">
-              {messages.map((message, index) => (
+              {messages?.map((message, index) => (
                 <ChatMessage key={index} role={message.role} content={message.content} />
               ))}
               {isLoading && (
@@ -157,7 +177,12 @@ export function ChatView() {
                   <div className="p-2 bg-muted rounded-full animate-pulse">
                     <Loader2 className="w-5 h-5 text-primary animate-spin" />
                   </div>
-                   <p className="text-sm text-muted-foreground">Thinking...</p>
+                  <p className="text-sm text-muted-foreground">Thinking...</p>
+                </div>
+              )}
+              {messages?.length === 0 && !isLoading && (
+                <div className="text-center text-muted-foreground py-10">
+                  No messages yet. Select a document and ask a question!
                 </div>
               )}
             </div>
@@ -165,56 +190,56 @@ export function ChatView() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="documentId"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label>Select a Document</Label>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={documentsLoading}>
+                <FormField
+                  control={form.control}
+                  name="documentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label>Select a Document</Label>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a document" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {documents?.length === 0 ? (
+                            <SelectItem value="none" disabled>No documents uploaded</SelectItem>
+                          ) : (
+                            documents?.map((doc) => (
+                              <SelectItem key={doc.id} value={String(doc.id)}>{doc.title}</SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="query"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label>Your Question</Label>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a document to chat with" />
-                        </SelectTrigger>
+                        <div className="relative" suppressHydrationWarning>
+                          <Input placeholder="Ask your question..." {...field} className="pr-12" suppressHydrationWarning />
+                          <Button
+                            type="submit"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                            disabled={isLoading}
+                            suppressHydrationWarning
+                          >
+                            <Send className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </FormControl>
-                      <SelectContent>
-                        {documentsLoading ? (
-                           <SelectItem value="loading" disabled>Loading documents...</SelectItem>
-                        ) : (
-                          documents?.map((doc) => (
-                            <SelectItem key={doc.id} value={doc.id}>{doc.title}</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="query"
-                render={({ field }) => (
-                  <FormItem>
-                    <Label>Your Question</Label>
-                    <FormControl>
-                      <div className="relative" suppressHydrationWarning>
-                        <Input placeholder="Ask your question..." {...field} className="pr-12" suppressHydrationWarning/>
-                        <Button
-                          type="submit"
-                          size="icon"
-                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                          disabled={isLoading}
-                          suppressHydrationWarning
-                        >
-                          <Send className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </form>
           </Form>

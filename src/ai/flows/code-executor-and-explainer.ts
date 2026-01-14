@@ -7,8 +7,8 @@
  * - CodeExecutorAndExplainerOutput - The return type for the codeExecutorAndExplainer function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const CodeExecutorAndExplainerInputSchema = z.object({
   code: z
@@ -36,7 +36,7 @@ const executeCode = ai.defineTool(
     }),
     outputSchema: z.string(),
   },
-  async (input) => {
+  async (input: any) => {
     // TODO: Implement secure code execution here.
     // This is a placeholder; replace with actual sandboxed execution.
     console.log("Executing code:", input.code);
@@ -48,8 +48,8 @@ const executeCode = ai.defineTool(
 const codeExecutorAndExplainerPrompt = ai.definePrompt({
   name: 'codeExecutorAndExplainerPrompt',
   tools: [executeCode],
-  input: {schema: CodeExecutorAndExplainerInputSchema},
-  output: {schema: CodeExecutorAndExplainerOutputSchema},
+  input: { schema: CodeExecutorAndExplainerInputSchema },
+  output: { schema: CodeExecutorAndExplainerOutputSchema },
   prompt: `You are an AI assistant that executes code snippets and explains the results with citations to course materials. 
   Always cite the source.
 
@@ -70,8 +70,8 @@ const codeExecutorAndExplainerFlow = ai.defineFlow(
     inputSchema: CodeExecutorAndExplainerInputSchema,
     outputSchema: CodeExecutorAndExplainerOutputSchema,
   },
-  async input => {
-    const {output} = await codeExecutorAndExplainerPrompt(input);
+  async (input: any) => {
+    const { output } = await codeExecutorAndExplainerPrompt(input);
     return output!;
   }
 );

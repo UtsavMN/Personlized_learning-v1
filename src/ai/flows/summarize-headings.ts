@@ -42,7 +42,7 @@ const summarizeHeadingsFlow = ai.defineFlow(
     inputSchema: SummarizeHeadingsInputSchema,
     outputSchema: SummarizeHeadingsOutputSchema,
   },
-  async input => {
+  async (input: any) => {
     const { output } = await prompt(input);
     return output!;
   }

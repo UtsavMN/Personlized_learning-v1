@@ -1,0 +1,46 @@
+[
+  {
+    "topic_id": "limits",
+    "subject": "Math",
+    "difficulty": 2,
+    "prerequisites": []
+  },
+  {
+    "topic_id": "derivatives",
+    "subject": "Math",
+    "difficulty": 3,
+    "prerequisites": [
+      "limits"
+    ]
+  },
+  {
+    "topic_id": "integrals",
+    "subject": "Math",
+    "difficulty": 3,
+    "prerequisites": [
+      "derivatives"
+    ]
+  },
+  {
+    "topic_id": "arrays",
+    "subject": "CS",
+    "difficulty": 2,
+    "prerequisites": []
+  },
+  {
+    "topic_id": "linked_lists",
+    "subject": "CS",
+    "difficulty": 3,
+    "prerequisites": [
+      "arrays"
+    ]
+  },
+  {
+    "topic_id": "trees",
+    "subject": "CS",
+    "difficulty": 4,
+    "prerequisites": [
+      "linked_lists"
+    ]
+  }
+]

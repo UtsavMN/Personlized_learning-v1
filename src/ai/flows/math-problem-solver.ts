@@ -8,8 +8,8 @@
  * - MathProblemSolverOutput - The return type for the mathProblemSolver function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const MathProblemSolverInputSchema = z.object({
   problem: z.string().describe('The math problem to solve.'),
@@ -41,8 +41,8 @@ export async function mathProblemSolver(input: MathProblemSolverInput): Promise<
 
 const prompt = ai.definePrompt({
   name: 'mathProblemSolverPrompt',
-  input: {schema: MathProblemSolverInputSchema},
-  output: {schema: MathProblemSolverOutputSchema},
+  input: { schema: MathProblemSolverInputSchema },
+  output: { schema: MathProblemSolverOutputSchema },
   prompt: `You are an expert math solver and tutor. Respond in a concise, modern, pointwise style as follows:\n\n- Start with a one-sentence introduction if helpful.\n- Present the step-by-step solution as a bullet list; each step must be on its own line and start with a dash "-".\n- After any step that uses the provided course materials, add an inline citation in square brackets (e.g., [1]).\n- End with a short concluding summary if relevant.\n- Finally, include a "Citations" section that lists the referenced sources and their indices.\n\nProblem: {{{problem}}}\nCourse Materials: {{{courseMaterials}}}\n\nSolution (bullet list) and Citations:`,
 });
 
@@ -52,8 +52,8 @@ const mathProblemSolverFlow = ai.defineFlow(
     inputSchema: MathProblemSolverInputSchema,
     outputSchema: MathProblemSolverOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (input: any) => {
+    const { output } = await prompt(input);
     return output!;
   }
 );

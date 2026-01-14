@@ -8,8 +8,8 @@
  * - TimetableConflictResolverOutput - The return type for the timetableConflictResolver function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const TimetableConflictResolverInputSchema = z.object({
   scheduleConflictDescription: z
@@ -66,8 +66,8 @@ export async function timetableConflictResolver(
 
 const prompt = ai.definePrompt({
   name: 'timetableConflictResolverPrompt',
-  input: {schema: TimetableConflictResolverInputSchema},
-  output: {schema: TimetableConflictResolverOutputSchema},
+  input: { schema: TimetableConflictResolverInputSchema },
+  output: { schema: TimetableConflictResolverOutputSchema },
   prompt: `You are an expert academic advisor specializing in resolving timetable conflicts based on university policy.
 
 You will analyze the described schedule conflict, the provided timetable policy document, and the student's current timetable to propose resolution options and cite the relevant policy.
@@ -87,8 +87,8 @@ const timetableConflictResolverFlow = ai.defineFlow(
     inputSchema: TimetableConflictResolverInputSchema,
     outputSchema: TimetableConflictResolverOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (input: any) => {
+    const { output } = await prompt(input);
     return output!;
   }
 );
