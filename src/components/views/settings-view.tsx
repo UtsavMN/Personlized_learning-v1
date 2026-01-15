@@ -3,7 +3,7 @@
 import { useLocalAuth } from '@/lib/auth-context';
 import { FactoryResetWidget } from '@/components/factory-reset';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, ShieldAlert, Mail, Plus, X, Save, Target, Brain } from 'lucide-react';
+import { User, ShieldAlert, Mail, Plus, X, Save, Target, Brain, TrendingUp } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { db } from '@/lib/db';
 import { cn, generateTopicId } from '@/lib/utils';
@@ -63,10 +63,61 @@ export function SettingsView() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Explainable AI Section (Goal 2) */}
+            <Card className="border-blue-500/20 bg-blue-50/10">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Brain className="w-5 h-5 text-blue-500" />
+                        How Mentora Thinks
+                    </CardTitle>
+                    <CardDescription>Transparency into the AI decision making process.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-3 gap-4">
+                    <div className="p-4 border rounded-lg bg-card">
+                        <div className="font-semibold mb-1 flex items-center gap-2">
+                            <Target className="w-4 h-4 text-green-500" />
+                            Rule-Based Engine
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            Used for urgent alerts and basic study tips. If you study late, simple rules trigger "Rest" recommendations.
+                        </p>
+                    </div>
+                    <div className="p-4 border rounded-lg bg-card">
+                        <div className="font-semibold mb-1 flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-purple-500" />
+                            Reinforcement Learning
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            The scheduler learns from your <span className="font-mono text-xs bg-muted px-1 rounded">thumbs up/down</span> feedback and study patterns to optimize time-slots.
+                        </p>
+                    </div>
+                    <div className="p-4 border rounded-lg bg-card">
+                        <div className="font-semibold mb-1 flex items-center gap-2">
+                            <Brain className="w-4 h-4 text-rose-500" />
+                            Neural Network
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            A TensorFlow.js model runs locally to predict grades based on your focus duration and quiz scores.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
 
+
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function ProfileEditor() {
     const { user } = useLocalAuth();
@@ -74,14 +125,26 @@ function ProfileEditor() {
     const mastery = useLiveQuery(() => db.subjectMastery.toArray());
 
     const [isEditing, setIsEditing] = useState(false);
+
+    // Form State
     const [name, setName] = useState("");
     const [goals, setGoals] = useState("");
+    const [semester, setSemester] = useState("1");
+    const [branch, setBranch] = useState("");
+    const [studyHours, setStudyHours] = useState("10");
+    const [preferredTime, setPreferredTime] = useState("evening");
+
     const [newSubject, setNewSubject] = useState("");
+    const [deleteCandidate, setDeleteCandidate] = useState<any>(null);
 
     useEffect(() => {
         if (profile) {
             setName(profile.name);
             setGoals(profile.goals.join('\n'));
+            setSemester(profile.semester || "1");
+            setBranch(profile.branch || "");
+            setStudyHours(profile.availableHoursPerWeek?.toString() || "10");
+            setPreferredTime(profile.preferredTime || "evening");
         }
     }, [profile]);
 
@@ -92,10 +155,8 @@ function ProfileEditor() {
         }
 
         try {
-            // Find valid ID (either from object or query)
             let profileId = profile?.id;
             if (!profileId) {
-                // Should technically not happen if parent renders correct, but safe fallback
                 const p = await db.learnerProfile.where('userId').equals(user.uid).first();
                 profileId = p?.id;
             }
@@ -106,7 +167,11 @@ function ProfileEditor() {
 
             await db.learnerProfile.update(profileId, {
                 name: name,
-                goals: goals.split('\n').filter(g => g.trim().length > 0)
+                goals: goals.split('\n').filter(g => g.trim().length > 0),
+                semester: semester,
+                branch: branch,
+                availableHoursPerWeek: parseInt(studyHours) || 10,
+                preferredTime: preferredTime as 'morning' | 'evening'
             });
 
             setIsEditing(false);
@@ -122,7 +187,6 @@ function ProfileEditor() {
         const sub = newSubject.trim();
         const id = generateTopicId(sub);
 
-        // Check duplicate (case insensitive check on topicId)
         const exists = await db.subjectMastery.where('topicId').equals(id).count();
         if (exists > 0) {
             toast({ title: "Subject already exists", description: "You are already tracking this subject.", variant: "destructive" });
@@ -149,16 +213,25 @@ function ProfileEditor() {
         }
     };
 
-    const handleRemoveSubject = async (id: number) => {
-        if (!id) return;
-        if (confirm("Stop tracking this subject? Mastery data will be lost.")) {
-            try {
-                await db.subjectMastery.delete(id);
-                toast({ title: "Subject Removed" });
-            } catch (e: any) {
-                console.error("Remove Subject Error:", e);
-                toast({ title: "Error", description: "Failed to remove subject: " + e.message, variant: "destructive" });
+    const confirmDelete = async () => {
+        if (!deleteCandidate) return;
+        const item = deleteCandidate;
+
+        try {
+            if (item.id) {
+                await db.subjectMastery.delete(item.id);
+            } else if (item.topicId) {
+                // Fallback delete by topicId
+                await db.subjectMastery.where('topicId').equals(item.topicId).delete();
+            } else {
+                throw new Error("Could not identify subject to delete.");
             }
+            toast({ title: "Subject Removed" });
+        } catch (e: any) {
+            console.error("Remove Subject Error:", e);
+            toast({ title: "Error", description: "Failed to remove subject: " + e.message, variant: "destructive" });
+        } finally {
+            setDeleteCandidate(null);
         }
     };
 
@@ -179,13 +252,39 @@ function ProfileEditor() {
             <CardContent className="space-y-6">
                 {/* Basic Info */}
                 <div className="grid gap-4 border p-4 rounded-lg bg-muted/10">
-                    <div className="grid gap-2">
-                        <Label>Display Name</Label>
-                        {isEditing ? (
-                            <Input value={name} onChange={e => setName(e.target.value)} />
-                        ) : (
-                            <p className="text-sm font-medium">{profile.name}</p>
-                        )}
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Display Name</Label>
+                            {isEditing ? (
+                                <Input value={name} onChange={e => setName(e.target.value)} />
+                            ) : (
+                                <p className="text-sm font-medium">{profile.name}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Branch / Major</Label>
+                            {isEditing ? (
+                                <Input value={branch} onChange={e => setBranch(e.target.value)} placeholder="e.g. Computer Science" />
+                            ) : (
+                                <p className="text-sm font-medium">{profile.branch || "Undeclared"}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Semester</Label>
+                            {isEditing ? (
+                                <Input type="number" min={1} max={8} value={semester} onChange={e => setSemester(e.target.value)} />
+                            ) : (
+                                <p className="text-sm font-medium">Semester {profile.semester || "-"}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Study Hours / Week</Label>
+                            {isEditing ? (
+                                <Input type="number" min={1} value={studyHours} onChange={e => setStudyHours(e.target.value)} />
+                            ) : (
+                                <p className="text-sm font-medium">{profile.availableHoursPerWeek} hours</p>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -243,7 +342,7 @@ function ProfileEditor() {
                                         variant="ghost"
                                         size="icon"
                                         className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                        onClick={() => m.id && handleRemoveSubject(m.id)}
+                                        onClick={() => setDeleteCandidate(m)}
                                     >
                                         <X className="w-4 h-4" />
                                     </Button>
@@ -253,6 +352,23 @@ function ProfileEditor() {
                     </div>
                 </div>
             </CardContent>
+
+            <AlertDialog open={!!deleteCandidate} onOpenChange={(open) => !open && setDeleteCandidate(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Stop tracking subject?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to remove <strong>{deleteCandidate?.subject}</strong>? All mastery data and XP for this subject will be permanently lost.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                            Stop Tracking
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }
@@ -270,7 +386,29 @@ function BrainInspector() {
         });
     }, [refresh]);
 
+    const handleReset = async () => {
+        if (confirm("Reset AI Brain? All learned habits will be forgotten.")) {
+            const { rlScheduler } = await import('@/lib/ai/rl-scheduler');
+            rlScheduler.reset();
+            setRefresh(prev => prev + 1);
+            toast({ title: "Brain Wiped", description: "The agent has forgotten everything." });
+        }
+    };
+
     const items = Object.entries(qTable);
+
+    const formatState = (hash: string) => {
+        const [day, energy, prev] = hash.split('-');
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const energyLabels = ['?', 'Low', 'Med', 'High'];
+        return (
+            <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                <span className="font-semibold text-primary">{days[parseInt(day)] || day}</span>
+                <span>Energy: {energyLabels[parseInt(energy)] || energy}</span>
+                <span>Prev: {prev}</span>
+            </div>
+        );
+    };
 
     return (
         <div className="space-y-4">
@@ -278,23 +416,46 @@ function BrainInspector() {
                 <div className="text-sm text-muted-foreground">
                     <span className="font-bold text-foreground">{items.length}</span> States Learned
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setRefresh(prev => prev + 1)}>Refresh Data</Button>
+                <div className="flex gap-2">
+                    <Button variant="destructive" size="sm" onClick={handleReset} className="h-8 text-xs">
+                        <Brain className="w-3 h-3 mr-2" /> Reset Memory
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setRefresh(prev => prev + 1)} className="h-8 text-xs">
+                        Refresh
+                    </Button>
+                </div>
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-lg p-2 bg-muted/20">
+            <div className="max-h-[300px] overflow-y-auto space-y-0 border rounded-lg bg-card shadow-sm divide-y">
                 {items.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                        No learning data yet. Complete a study session!
+                    <div className="text-center py-12 text-muted-foreground text-sm flex flex-col items-center gap-2">
+                        <Brain className="w-8 h-8 opacity-20" />
+                        No learning data yet. Start using the Smart Agent!
                     </div>
                 ) : (
                     items.map(([state, actions], i) => (
-                        <div key={i} className="text-xs font-mono p-2 bg-card border rounded shadow-sm">
-                            <div className="font-semibold mb-1 text-primary">{state}</div>
-                            <div className="grid grid-cols-2 gap-1">
+                        <div key={i} className="flex flex-col sm:flex-row p-3 gap-4 hover:bg-muted/50 transition-colors">
+                            <div className="w-24 shrink-0 border-r pr-4">
+                                {formatState(state)}
+                            </div>
+                            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2">
                                 {Object.entries(actions).map(([action, value]) => (
-                                    <div key={action} title={action} className="flex justify-between px-1 bg-muted/50 rounded">
-                                        <span>{action.substring(0, 4)}:</span>
-                                        <span>{value?.toFixed(2)}</span>
+                                    <div
+                                        key={action}
+                                        className={cn(
+                                            "flex flex-col p-2 rounded border text-xs text-center transition-all",
+                                            value > 5 ? "bg-green-500/10 border-green-500/30" :
+                                                value < 0 ? "bg-red-500/10 border-red-500/30" : "bg-muted/30"
+                                        )}
+                                    >
+                                        <span className="font-medium truncate" title={action}>{action}</span>
+                                        <span className={cn(
+                                            "font-mono font-bold",
+                                            value > 0 ? "text-green-600 dark:text-green-400" :
+                                                value < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
+                                        )}>
+                                            {value?.toFixed(1)}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
@@ -303,7 +464,7 @@ function BrainInspector() {
                 )}
             </div>
             <p className="text-[10px] text-muted-foreground text-right">
-                Values represent expected reward (Q-Value).
+                Correct actions get +10. Bad actions get -5.
             </p>
         </div>
     );

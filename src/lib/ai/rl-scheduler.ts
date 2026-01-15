@@ -104,6 +104,7 @@ export class RLScheduler {
         if (serialized) {
             try {
                 this.qTable = new Map(JSON.parse(serialized));
+                this.sanitize(); // Clean up old data on load
                 return;
             } catch (e) {
                 console.error("Failed to load Q-Table V2", e);
@@ -113,6 +114,30 @@ export class RLScheduler {
         // Fallback: clear old incompatible data or start fresh
         // ignoring v1 table as it was number[]
         this.qTable = new Map();
+    }
+
+    private sanitize() {
+        // Remove known mock subjects from all states
+        const mockSubjects = ['Math', 'Physics', 'Chemistry', 'Phys', 'Chem', 'Brea']; // 'Brea' was a typo seen in logs
+        for (const [state, actions] of this.qTable.entries()) {
+            let changed = false;
+            for (const mock of mockSubjects) {
+                if (actions[mock] !== undefined) {
+                    delete actions[mock];
+                    changed = true;
+                }
+            }
+            if (actions['Break'] === undefined && actions['Brea'] !== undefined) {
+                // Fix typo if exists
+                actions['Break'] = actions['Brea'];
+                delete actions['Brea'];
+                changed = true;
+            }
+            if (changed) {
+                this.qTable.set(state, actions);
+            }
+        }
+        this.save();
     }
 
     // --- Visualization ---
@@ -131,6 +156,13 @@ export class RLScheduler {
 
     public getQTableFull(): Record<string, Record<string, number>> {
         return Object.fromEntries(this.qTable);
+    }
+
+    public reset() {
+        this.qTable.clear();
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('mentora_rl_qtable_v2');
+        }
     }
 }
 

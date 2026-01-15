@@ -19,9 +19,11 @@ import {
     BookText,
     Calculator,
     CalendarClock,
+    CheckSquare,
     Code2,
     FileUp,
     LayoutDashboard,
+    FlaskConical,
     Dumbbell,
     GraduationCap,
     LogOut,
@@ -55,24 +57,22 @@ export function AppSidebar({
             items: [
                 { title: 'Dashboard', icon: LayoutDashboard, value: 'dashboard' },
                 { title: 'Schedule', icon: CalendarClock, value: 'timetable' },
+                { title: 'Tracker', icon: CheckSquare, value: 'tracker' },
                 { title: 'Documents', icon: FileUp, value: 'documents' },
             ]
         },
         {
             label: "Practice",
             items: [
-                { title: 'Quiz', icon: CircleHelp, value: 'quiz' },
-                { title: 'Math Solver', icon: Calculator, value: 'math' },
-                { title: 'Code Lab', icon: Code2, value: 'code' },
+                { title: 'Assessment', icon: CircleHelp, value: 'quiz' },
+                { title: 'The Lab', icon: FlaskConical, value: 'studio' },
                 { title: 'Pulse', icon: Brain, value: 'flashcards' },
-                { title: 'Grade AI', icon: TrendingUp, value: 'predictor' },
-                { title: 'Smart Agent', icon: BrainCircuit, value: 'rl-agent' },
+                { title: 'Smart Agent', icon: BrainCircuit, value: 'smart-agent' },
             ]
         },
         {
             label: "Community",
             items: [
-                { title: 'AI Tutor', icon: BookText, value: 'chat' },
                 { title: 'Profile', icon: User, value: 'settings' },
             ]
         }

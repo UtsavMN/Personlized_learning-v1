@@ -11,15 +11,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Loader2, Plus, Brain, RotateCcw, Check, Sparkles } from 'lucide-react';
-
+import { Loader2, Plus, Brain, RotateCcw, Check, Sparkles, X, Layers, Play, StickyNote, Zap } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { NotesView } from './notes-view';
 
 export function FlashcardsView() {
     const { toast } = useToast();
     const decks = useLiveQuery(() => db.flashcardDecks.toArray());
     const [selectedDeck, setSelectedDeck] = useState<number | null>(null);
-    const [studyMode, setStudyMode] = useState(false);
+    const [activeTab, setActiveTab] = useState('flashcards');
 
     // Creation State
     const [isCreating, setIsCreating] = useState(false);
@@ -33,7 +35,6 @@ export function FlashcardsView() {
         if (!newDeckName) return;
         setIsCreating(true);
         try {
-            // 1. Create Deck Entry
             const deckId = await db.flashcardDecks.add({
                 title: newDeckName,
                 subject: selectedSubject,
@@ -41,17 +42,12 @@ export function FlashcardsView() {
                 createdAt: Date.now()
             });
 
-            // 2. Generate Cards via AI or Placeholder
             if (selectedDocId) {
                 const doc = await db.documents.get(parseInt(selectedDocId));
-
                 if (doc && doc.content) {
-                    toast({ title: "Loading AI Model...", description: "This happens locally and may take a moment." });
-
-                    // Dynamic import for client-side ML
+                    toast({ title: "Synthesizing Cards...", description: "AI is analyzing the document context." });
                     const { generateFlashcardsLocal } = await import('@/lib/ai/local-flows');
                     const cards = await generateFlashcardsLocal(doc.content, 5);
-
                     if (cards && cards.length > 0) {
                         const cardsToAdd = cards.map(card => ({
                             deckId,
@@ -62,31 +58,22 @@ export function FlashcardsView() {
                         }));
                         await db.flashcards.bulkAdd(cardsToAdd as Flashcard[]);
                         toast({ title: "Success", description: `Generated ${cards.length} cards from ${doc.title}` });
-                    } else {
-                        throw new Error("AI returned no cards.");
                     }
                 } else {
-                    // Empty Deck (Manual) - Placeholder or No Content
                     await db.flashcards.add({
                         deckId,
-                        front: "New Card (Edit me)",
-                        back: "Answer goes here",
+                        front: "Edit this card",
+                        back: "Add the answer here",
                         ...INITIAL_CARD_STATE,
                         nextReview: Date.now()
                     } as Flashcard);
-                    if (doc) {
-                        toast({ title: "Warning", description: "Document had no text. Created empty deck.", variant: "destructive" });
-                    } else {
-                        toast({ title: "Deck Created", description: "Created empty deck." });
-                    }
+                    toast({ title: "Deck Created", description: "Created empty deck." });
                 }
-
                 setNewDeckName('');
                 setSelectedDocId('');
             }
         } catch (e: any) {
-            console.error(e);
-            toast({ variant: "destructive", title: "Generation Error", description: e.message || "Failed to create deck" });
+            toast({ variant: "destructive", title: "Error", description: "Failed to create deck" });
         } finally {
             setIsCreating(false);
         }
@@ -97,78 +84,115 @@ export function FlashcardsView() {
     }
 
     return (
-        <div className="h-full p-6 space-y-6 animate-in fade-in">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight mb-2">My Decks</h2>
-                    <p className="text-muted-foreground">Spaced repetition for long-term memory.</p>
-                </div>
+        <div className="h-full p-2 md:p-6 space-y-6 animate-in fade-in duration-500 flex flex-col">
 
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button><Plus className="w-4 h-4 mr-2" /> New Deck</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Create New Flashcard Deck</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label>Deck Name</Label>
-                                <Input value={newDeckName} onChange={e => setNewDeckName(e.target.value)} placeholder="e.g. Physics Ch1" />
+            {/* Header / Tabs */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 p-8 rounded-3xl bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-white/20 dark:border-white/5 backdrop-blur-xl shadow-xl shrink-0">
+                <div className="space-y-4 w-full">
+                    <div className="flex justify-between items-start w-full">
+                        <div>
+                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 mb-2">
+                                <Sparkles className="w-5 h-5" />
+                                <span className="font-semibold tracking-wide uppercase text-xs">Learning Engine</span>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Subject</Label>
-                                <select
-                                    className="w-full p-2 border rounded-md bg-background"
-                                    value={selectedSubject}
-                                    onChange={e => setSelectedSubject(e.target.value)}
-                                >
-                                    <option value="General">General</option>
-                                    {masterySubjects?.map(s => (
-                                        <option key={s.id} value={s.subject}>{s.subject}</option>
-                                    ))}
-                                    <option value="Math">Math</option>
-                                    <option value="Physics">Physics</option>
-                                    <option value="History">History</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Source Document (Optional)</Label>
-                                <select
-                                    className="w-full p-2 border rounded-md bg-background"
-                                    value={selectedDocId}
-                                    onChange={e => setSelectedDocId(e.target.value)}
-                                >
-                                    <option value="">None (Empty Deck)</option>
-                                    {documents?.map(doc => (
-                                        <option key={doc.id} value={doc.id}>{doc.title}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <Button onClick={handleCreateDeck} disabled={!newDeckName || isCreating} className="w-full">
-                                {isCreating ? <Loader2 className="animate-spin" /> : "Create Deck"}
-                            </Button>
+                            <h2 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-300 dark:to-purple-300">
+                                Pulse
+                            </h2>
+                            <p className="text-muted-foreground mt-2 max-w-lg">
+                                Your central hub for active recall and knowledge management.
+                            </p>
                         </div>
-                    </DialogContent>
-                </Dialog>
+                        {/* Action Buttons based on Tab */}
+                        {activeTab === 'flashcards' && (
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button size="lg" className="rounded-full shadow-lg shadow-indigo-500/20 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                        <Plus className="w-5 h-5 mr-2" /> CREATE DECK
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle>New Knowledge Deck</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 py-4">
+                                        <div className="space-y-2">
+                                            <Label>Deck Name</Label>
+                                            <Input value={newDeckName} onChange={e => setNewDeckName(e.target.value)} placeholder="e.g. Quantum Physics" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Subject</Label>
+                                            <select className="w-full p-2.5 text-sm border rounded-lg bg-background"
+                                                value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}>
+                                                <option value="General">General</option>
+                                                {masterySubjects?.map(s => <option key={s.id} value={s.subject}>{s.subject}</option>)}
+                                                <option value="Math">Math</option>
+                                                <option value="Science">Science</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Source Material (AI Generation)</Label>
+                                            <select className="w-full p-2.5 text-sm border rounded-lg bg-background"
+                                                value={selectedDocId} onChange={e => setSelectedDocId(e.target.value)}>
+                                                <option value="">Manual Entry (No AI)</option>
+                                                {documents?.map(doc => <option key={doc.id} value={doc.id}>{doc.title}</option>)}
+                                            </select>
+                                        </div>
+                                        <Button onClick={handleCreateDeck} disabled={!newDeckName || isCreating} className="w-full h-10">
+                                            {isCreating ? <Loader2 className="animate-spin" /> : "Create Deck"}
+                                        </Button>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        )}
+                    </div>
+
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                        <TabsList className="bg-background/50 backdrop-blur-md border p-1 rounded-full">
+                            <TabsTrigger value="flashcards" className="rounded-full px-6 data-[state=active]:bg-indigo-100 dark:data-[state=active]:bg-indigo-900/30 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-300">
+                                <Zap className="w-4 h-4 mr-2" /> Flashcards
+                            </TabsTrigger>
+                            <TabsTrigger value="notes" className="rounded-full px-6 data-[state=active]:bg-purple-100 dark:data-[state=active]:bg-purple-900/30 data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-300">
+                                <StickyNote className="w-4 h-4 mr-2" /> Notes
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {decks?.map(deck => (
-                    <Card key={deck.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setSelectedDeck(deck.id!)}>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between">
-                                {deck.title}
-                                <Badge variant="outline"><Brain className="w-3 h-3 mr-1" /> SRS</Badge>
-                            </CardTitle>
-                            <CardDescription>{deck.subject}</CardDescription>
-                        </CardHeader>
-                        <CardFooter className="text-xs text-muted-foreground">
-                            Last reviewed: Never
-                        </CardFooter>
-                    </Card>
-                ))}
+            {/* Content Area */}
+            <div className="flex-1 overflow-hidden">
+                {activeTab === 'flashcards' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6">
+                        {decks?.map(deck => (
+                            <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.2 }} key={deck.id}>
+                                <Card className="group relative overflow-hidden border-0 bg-card/50 hover:bg-card/80 transition-colors shadow-sm hover:shadow-xl rounded-2xl cursor-pointer h-full" onClick={() => setSelectedDeck(deck.id!)}>
+
+                                    {/* Decorative background element */}
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500 ease-in-out" />
+
+                                    <CardHeader>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">{deck.subject}</Badge>
+                                            <Layers className="w-5 h-5 text-muted-foreground/50" />
+                                        </div>
+                                        <CardTitle className="text-xl font-bold leading-tight">{deck.title}</CardTitle>
+                                        <CardDescription className="line-clamp-2">
+                                            Adaptive SRS deck
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardFooter className="mt-auto pt-4 border-t border-border/50">
+                                        <div className="flex items-center text-sm font-medium text-primary group-hover:translate-x-1 transition-transform">
+                                            <Play className="w-4 h-4 mr-2 fill-current" />
+                                            Start Session
+                                        </div>
+                                    </CardFooter>
+                                </Card>
+                            </motion.div>
+                        ))}
+                    </div>
+                ) : (
+                    <NotesView />
+                )}
             </div>
         </div>
     );
@@ -182,116 +206,131 @@ function StudySession({ deckId, onExit }: { deckId: number, onExit: () => void }
     const [isFlipped, setIsFlipped] = useState(false);
     const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0, startTime: Date.now() });
 
-    if (!cards) return <div className="p-10 text-center"><Loader2 className="animate-spin inline" /> Loading cards...</div>;
-    if (cards.length === 0) return (
-        <div className="flex flex-col items-center justify-center h-full space-y-4">
-            <p>This deck is empty.</p>
-            <Button onClick={onExit}>Back</Button>
-        </div>
-    );
+    if (!cards) return <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+    if (cards.length === 0) return <div className="h-full flex flex-col items-center justify-center"><p className="text-lg text-muted-foreground mb-4">Deck is empty.</p><Button onClick={onExit}>Back</Button></div>;
 
     const currentCard = cards[currentIndex];
+    const progress = ((currentIndex) / cards.length) * 100;
 
     const handleRate = async (quality: number) => {
-        // Update Stats
         setSessionStats(prev => ({
             ...prev,
             total: prev.total + 1,
             correct: quality >= 3 ? prev.correct + 1 : prev.correct
         }));
 
-        // Calculate new state
         const newState = calculateNextReview(quality, {
             interval: currentCard.interval || 0,
             repetition: currentCard.repetition || 0,
             easeFactor: currentCard.easeFactor || 2.5
         });
 
-        // Update DB
         await db.flashcards.update(currentCard.id!, {
             ...newState,
             nextReview: Date.now() + (newState.interval * 24 * 60 * 60 * 1000)
         });
 
-        // Next card logic
         setIsFlipped(false);
-
         if (currentIndex < cards.length - 1) {
-            setTimeout(() => setCurrentIndex(prev => prev + 1), 150);
+            setTimeout(() => setCurrentIndex(prev => prev + 1), 200);
         } else {
-            // End of Deck
-            // ---------------- SYNC WITH STUDY MANAGER ----------------
-            const durationSeconds = Math.round((Date.now() - sessionStats.startTime) / 1000);
             const finalScore = Math.round(((sessionStats.correct + (quality >= 3 ? 1 : 0)) / (sessionStats.total + 1)) * 100);
-
+            // Import dynamically to avoid hydration issues if StudyManager uses browser APIs heavily on init
             import('@/lib/ai/study-manager').then(({ studyManager }) => {
-                if (deck && deck.subject) {
+                if (deck?.subject) {
                     studyManager.completeSession({
                         subject: deck.subject,
                         activityType: 'flashcards',
-                        durationSeconds,
+                        durationSeconds: Math.round((Date.now() - sessionStats.startTime) / 1000),
                         scorePercent: finalScore,
                         itemsReviewed: cards.length
                     });
                 }
             });
-            // ---------------------------------------------------------
-
-            toast({ title: "Session Complete!", description: `Score: ${finalScore}%. Updated AI Models.` });
+            toast({ title: "Session Complete", description: `You scored ${finalScore}%` });
             onExit();
         }
     };
 
     return (
-        <div className="h-full flex flex-col items-center justify-center p-6 max-w-2xl mx-auto">
-            <div className="w-full flex justify-between items-center mb-6">
-                <Button variant="ghost" onClick={onExit}>Exit</Button>
-                <div className="text-sm text-muted-foreground">
-                    Card {currentIndex + 1} of {cards.length}
-                </div>
-            </div>
-
-            <div
-                className="w-full aspect-video perspective-1000 cursor-pointer mb-8"
-                onClick={() => setIsFlipped(!isFlipped)}
-            >
-                <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-                    {/* Front */}
-                    <Card className="absolute w-full h-full backface-hidden flex items-center justify-center text-center text-2xl font-medium p-6">
-                        <div className="w-full h-full overflow-y-auto flex items-center justify-center">
-                            <p className="max-h-full w-full break-words">{currentCard.front}</p>
-                        </div>
-                    </Card>
-
-                    {/* Back */}
-                    <Card className="absolute w-full h-full backface-hidden rotate-y-180 flex items-center justify-center text-center text-xl bg-muted/20 border-primary/20 p-6">
-                        <div className="w-full h-full overflow-y-auto flex items-center justify-center">
-                            <p className="max-h-full w-full break-words">{currentCard.back}</p>
-                        </div>
-                    </Card>
-                </div>
-            </div>
-
-            {isFlipped ? (
-                <div className="grid grid-cols-4 gap-2 w-full">
-                    <Button variant="outline" className="border-red-200 hover:bg-red-100 dark:hover:bg-red-900/20" onClick={() => handleRate(1)}>
-                        Forgot
-                    </Button>
-                    <Button variant="outline" className="border-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900/20" onClick={() => handleRate(3)}>
-                        Hard
-                    </Button>
-                    <Button variant="outline" className="border-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/20" onClick={() => handleRate(4)}>
-                        Good
-                    </Button>
-                    <Button variant="outline" className="border-green-200 hover:bg-green-100 dark:hover:bg-green-900/20" onClick={() => handleRate(5)}>
-                        Easy
-                    </Button>
-                </div>
-            ) : (
-                <Button className="w-full h-12 text-lg" onClick={() => setIsFlipped(true)}>
-                    Show Answer
+        <div className="h-full flex flex-col max-w-4xl mx-auto p-4 md:p-8 animate-in zoom-in-95 duration-300">
+            {/* Header / Progress */}
+            <div className="flex items-center gap-4 mb-8">
+                <Button variant="ghost" size="icon" onClick={onExit} className="rounded-full hover:bg-secondary">
+                    <X className="w-5 h-5" />
                 </Button>
-            )}
+                <div className="flex-1">
+                    <div className="flex justify-between text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                        <span>Progress</span>
+                        <span>{currentIndex + 1} / {cards.length}</span>
+                    </div>
+                    <Progress value={progress} className="h-2 rounded-full" />
+                </div>
+            </div>
+
+            {/* Flashcard Area */}
+            <div className="flex-1 flex flex-col items-center justify-center perspective-1000 mb-8 min-h-[400px]">
+                <div
+                    className="relative w-full max-w-2xl aspect-[1.6/1] preserve-3d transition-all duration-700 ease-in-out-back cursor-pointer group"
+                    style={{ transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+                    onClick={() => setIsFlipped(!isFlipped)}
+                >
+                    {/* Front Face */}
+                    <div className="absolute inset-0 backface-hidden rounded-[2rem] shadow-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center p-8 md:p-12 text-center group-hover:scale-[1.02] transition-transform">
+                        <span className="absolute top-8 left-8 text-xs font-bold text-muted-foreground uppercase tracking-widest">Question</span>
+                        <div className="w-full max-h-full overflow-y-auto custom-scrollbar">
+                            <p className="text-2xl md:text-4xl font-medium leading-relaxed break-words">{currentCard.front}</p>
+                        </div>
+                        <div className="absolute bottom-6 text-sm text-muted-foreground font-medium animate-pulse">Click to flip</div>
+                    </div>
+
+                    {/* Back Face */}
+                    <div className="absolute inset-0 backface-hidden rotate-y-180 rounded-[2rem] shadow-2xl bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-zinc-900 border border-indigo-100 dark:border-indigo-900/50 flex flex-col items-center justify-center p-8 md:p-12 text-center">
+                        <span className="absolute top-8 left-8 text-xs font-bold text-indigo-500 uppercase tracking-widest">Answer</span>
+                        <div className="w-full max-h-full overflow-y-auto custom-scrollbar">
+                            <p className="text-xl md:text-3xl font-medium leading-relaxed text-indigo-900 dark:text-indigo-100 break-words">{currentCard.back}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Controls */}
+            <div className="h-24">
+                <AnimatePresence mode="wait">
+                    {isFlipped ? (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                            className="grid grid-cols-4 gap-4 w-full max-w-2xl mx-auto"
+                        >
+                            <Button variant="outline" className="h-14 flex flex-col gap-1 border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20" onClick={(e) => { e.stopPropagation(); handleRate(1); }}>
+                                <span className="font-bold">Again</span>
+                                <span className="text-[10px] uppercase opacity-60">&lt; 1m</span>
+                            </Button>
+                            <Button variant="outline" className="h-14 flex flex-col gap-1 border-orange-200 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20" onClick={(e) => { e.stopPropagation(); handleRate(3); }}>
+                                <span className="font-bold">Hard</span>
+                                <span className="text-[10px] uppercase opacity-60">2d</span>
+                            </Button>
+                            <Button variant="outline" className="h-14 flex flex-col gap-1 border-blue-200 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20" onClick={(e) => { e.stopPropagation(); handleRate(4); }}>
+                                <span className="font-bold">Good</span>
+                                <span className="text-[10px] uppercase opacity-60">5d</span>
+                            </Button>
+                            <Button variant="outline" className="h-14 flex flex-col gap-1 border-green-200 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20" onClick={(e) => { e.stopPropagation(); handleRate(5); }}>
+                                <span className="font-bold">Easy</span>
+                                <span className="text-[10px] uppercase opacity-60">8d</span>
+                            </Button>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="flex justify-center"
+                        >
+                            <Button size="lg" className="px-12 h-14 text-lg rounded-full shadow-lg hover:shadow-xl transition-all" onClick={() => setIsFlipped(true)}>
+                                Show Answer
+                            </Button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
         </div>
     );
 }

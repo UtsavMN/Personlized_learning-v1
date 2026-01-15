@@ -15,33 +15,37 @@ export function GradePredictorView() {
 
     // Mock Inputs for MVP (In real app, fetch from db.analytics)
     const [inputs, setInputs] = useState({
-        avgQuizScore: 0.75, // 75%
-        studyHours: 5,
-        completedTasks: 12,
-        difficulty: 0.5 // Medium
+        avgQuizScore: 0,
+        studyHours: 0,
+        completedTasks: 0,
+        difficulty: 0.5
     });
+
+    useEffect(() => {
+        loadStats();
+    }, []);
+
+    const loadStats = async () => {
+        try {
+            const stats = await gradePredictor.getCurrentStats();
+            setInputs(stats.raw);
+        } catch (e) {
+            console.error("Failed to load stats", e);
+        }
+    };
 
     const handleTrain = async () => {
         setIsTraining(true);
         try {
-            toast({ title: "Training Neural Network...", description: "Learning from your study habits." });
+            toast({ title: "Training Neural Network...", description: "Learning from your history." });
 
-            // Mock Training Data (Simulating a pattern: More study + High scores = High Grade)
-            const trainingData = {
-                inputs: [
-                    [0.9, 10, 20, 0.8], // Good student -> 95%
-                    [0.4, 1, 2, 0.3],   // Low effort -> 40%
-                    [0.6, 5, 10, 0.5],  // Average -> 65%
-                    [0.8, 8, 15, 0.7],  // Good -> 85%
-                    [0.2, 0, 0, 0.2]    // No effort -> 20%
-                ],
-                labels: [0.95, 0.40, 0.65, 0.85, 0.20]
-            };
+            // Fetch Real Training Data
+            const trainingData = await gradePredictor.gatherTrainingData();
 
-            await gradePredictor.train({ ...trainingData, inputs: trainingData.inputs as any });
+            await gradePredictor.train(trainingData);
             await gradePredictor.save();
 
-            toast({ title: "Training Complete!", description: "Model updated and saved locally." });
+            toast({ title: "Training Complete!", description: `Trained on ${trainingData.labels.length} historical sessions.` });
         } catch (e) {
             console.error(e);
             toast({ variant: "destructive", title: "Training Failed" });
@@ -52,17 +56,14 @@ export function GradePredictorView() {
 
     const handlePredict = async () => {
         try {
-            const inputVector = [
-                inputs.avgQuizScore,
-                inputs.studyHours,
-                inputs.completedTasks,
-                inputs.difficulty
-            ] as [number, number, number, number];
+            // Re-fetch latest stats just in case
+            const current = await gradePredictor.getCurrentStats();
+            setInputs(current.raw);
 
-            const result = gradePredictor.predict(inputVector);
+            const result = gradePredictor.predict(current.inputs);
             setPrediction(result * 100);
         } catch (e) {
-            toast({ title: "Model not trained yet", description: "Please train the model first.", variant: "destructive" });
+            toast({ title: "Prediction Failed", description: "Ensure model is trained.", variant: "destructive" });
         }
     };
 
@@ -112,6 +113,54 @@ export function GradePredictorView() {
                                 </div>
                                 <p className="text-sm text-muted-foreground">Predicted Score</p>
                                 <Progress value={prediction} className="mt-4" />
+
+                                {/* Data Flow Visualization */}
+                                <div className="space-y-4 mt-8 relative">
+                                    <div className="absolute left-1/2 -top-6 w-0.5 h-6 bg-gradient-to-b from-transparent to-primary/50" />
+
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                                        <span className="font-semibold flex items-center gap-1.5 text-primary">
+                                            <TrendingUp className="w-4 h-4" /> Live Tracker Inputs
+                                        </span>
+                                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider">
+                                            Connected
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground relative z-10">
+                                        {/* Input Nodes */}
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm flex flex-col items-center gap-1 group relative overflow-hidden">
+                                            <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
+                                            <div className="font-bold text-lg text-foreground">{inputs.studyHours.toFixed(1)}h</div>
+                                            <div className="text-[10px] uppercase tracking-wide opacity-70">Study Time</div>
+                                            {/* Connection Line */}
+                                            <div className="absolute -bottom-8 left-1/2 w-0.5 h-8 bg-blue-200 dark:bg-blue-800" />
+                                        </div>
+
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm flex flex-col items-center gap-1 group relative overflow-hidden">
+                                            <div className="absolute inset-0 bg-purple-500/5 group-hover:bg-purple-500/10 transition-colors" />
+                                            <div className="font-bold text-lg text-foreground">{inputs.completedTasks}</div>
+                                            <div className="text-[10px] uppercase tracking-wide opacity-70">Tasks</div>
+                                            <div className="absolute -bottom-8 left-1/2 w-0.5 h-8 bg-purple-200 dark:bg-purple-800" />
+                                        </div>
+
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm flex flex-col items-center gap-1 group relative overflow-hidden">
+                                            <div className="absolute inset-0 bg-green-500/5 group-hover:bg-green-500/10 transition-colors" />
+                                            <div className="font-bold text-lg text-foreground">{inputs.avgQuizScore.toFixed(0)}%</div>
+                                            <div className="text-[10px] uppercase tracking-wide opacity-70">Quiz Avg</div>
+                                            <div className="absolute -bottom-8 left-1/2 w-0.5 h-8 bg-green-200 dark:bg-green-800" />
+                                        </div>
+                                    </div>
+
+                                    {/* Neural Node Representation */}
+                                    <div className="mt-8 mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/20 relative z-20 animate-pulse">
+                                        <Brain className="w-6 h-6 text-primary-foreground" />
+                                    </div>
+
+                                    <div className="text-[10px] text-center text-muted-foreground bg-muted/40 p-2 rounded-md mx-4 mt-2 border border-border/50">
+                                        Neural Network processing <strong>historical learning patterns</strong> to forecast outcomes.
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <div className="text-center py-10 text-muted-foreground">

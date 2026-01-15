@@ -43,13 +43,15 @@ export class StudyManager {
         // 1. Check for Critical Gaps (Grade Predictor Logic)
         // In a real app, we'd feed real user habits here. For now, we simulate.
         for (const item of masteryItems) {
-            // Predict grade based on simulated simple metrics
-            // (e.g. assume 5 hours study, 10 tasks)
+            // Predict grade based on Real User Habits
+            // We fetch global stats (study hours, tasks) and mix in the Subject's specific Mastery Score
+            const globalStats = await gradePredictor.getCurrentStats();
+
             const input: [number, number, number, number] = [
-                item.masteryScore / 100, // Quiz Score
-                0.5, // Normalized Study Hours (mock)
-                0.8, // Task Completion (mock)
-                0.7  // Difficulty (mock)
+                item.masteryScore / 100,      // Subject Specific Mastery
+                globalStats.inputs[1],        // Global Study Hours
+                globalStats.inputs[2],        // Global Task Comepletion
+                globalStats.inputs[3]         // Difficulty/Base
             ];
 
             const predictedGrade = gradePredictor.predict(input);
@@ -66,7 +68,7 @@ export class StudyManager {
                     priority: 'high',
                     reason: 'Low Predicted Grade',
                     actionLabel: 'Take Emergency Quiz',
-                    route: '/gym' // TODO: Deep link to specific quiz
+                    route: '/?view=flashcards'
                 });
             }
         }
@@ -92,7 +94,7 @@ export class StudyManager {
                 priority: 'medium',
                 reason: 'Optimal Time Block (RL)',
                 actionLabel: 'Start Flashcards',
-                route: '/flashcards'
+                route: '/?view=flashcards'
             });
         } else {
             recommendations.push({
@@ -121,7 +123,7 @@ export class StudyManager {
                     priority: 'medium',
                     reason: 'Lowest Mastery Score',
                     actionLabel: 'Practice',
-                    route: '/flashcards'
+                    route: '/?view=flashcards'
                 });
             }
         }

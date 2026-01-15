@@ -3,7 +3,9 @@ import { CreateMLCEngine, MLCEngine, InitProgressCallback } from "@mlc-ai/web-ll
 
 // Using Llama-3-8B-Instruct-q4f32_1 (Approx 4-5GB download)
 // Alternative: Phi-3-mini-4k-instruct-q4f16_1 (Smaller, Faster)
-const SELECTED_MODEL = "Llama-3-8B-Instruct-q4f32_1";
+// Using Phi-3.5-mini-instruct (Approx 2.5GB download) - Much lighter/stable than Llama-3-8B
+// Previous caused GPU Device Lost on some machines.
+const SELECTED_MODEL = "Phi-3.5-mini-instruct-q4f16_1-MLC";
 
 export interface ChatMessage {
     role: "user" | "assistant" | "system";
@@ -16,7 +18,7 @@ export class WebLLMEngine {
 
     // Track initialization state
     public isLoaded = false;
-    public isLoading = false;
+    private initPromise: Promise<void> | null = null;
     public progress: string = "";
 
     private constructor() { }
@@ -29,28 +31,36 @@ export class WebLLMEngine {
     }
 
     public async init(onProgress?: InitProgressCallback) {
-        if (this.isLoaded || this.isLoading) return;
+        if (this.isLoaded) return;
 
-        this.isLoading = true;
-        try {
-            console.log("Initializing WebLLM...");
-            // Create Engine
-            this.engine = await CreateMLCEngine(SELECTED_MODEL, {
-                initProgressCallback: (report) => {
-                    this.progress = report.text;
-                    console.log("[WebLLM]", report.text);
-                    if (onProgress) onProgress(report);
-                }
-            });
-
-            this.isLoaded = true;
-            console.log("WebLLM Loaded!");
-        } catch (e) {
-            console.error("Failed to load WebLLM", e);
-            throw e;
-        } finally {
-            this.isLoading = false;
+        // Use existing promise if already loading
+        if (this.initPromise) {
+            return this.initPromise;
         }
+
+        this.initPromise = (async () => {
+            try {
+                console.log("Initializing WebLLM...");
+                // Create Engine
+                this.engine = await CreateMLCEngine(SELECTED_MODEL, {
+                    initProgressCallback: (report) => {
+                        this.progress = report.text;
+                        console.log("[WebLLM]", report.text);
+                        if (onProgress) onProgress(report);
+                    }
+                });
+
+                this.isLoaded = true;
+                console.log("WebLLM Loaded!");
+            } catch (e) {
+                console.error("Failed to load WebLLM", e);
+                // Reset promise on failure so we can retry
+                this.initPromise = null;
+                throw e;
+            }
+        })();
+
+        return this.initPromise;
     }
 
     public async chat(messages: ChatMessage[], onUpdate: (chunk: string) => void): Promise<string> {

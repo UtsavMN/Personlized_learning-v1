@@ -9,6 +9,8 @@ import { Brain, Flame, Clock, BookOpen, ArrowUpRight, Target } from "lucide-reac
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { Button } from '@/components/ui/button';
 import { AIRecommendationsWidget } from '../widgets/ai-recommendations';
+import { AIReasoningPanel } from '../widgets/ai-reasoning-panel';
+import { toast } from '@/hooks/use-toast';
 
 export function DashboardView() {
     const { user } = useLocalAuth();
@@ -67,7 +69,9 @@ export function DashboardView() {
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl transform -translate-x-1/2 translate-y-1/2" />
             </div>
 
-            {/* Stats Grid */}
+            {/* AI Reasoning Layer (Goal 2) */}
+            <AIReasoningPanel />
+
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatsCard
@@ -131,7 +135,7 @@ export function DashboardView() {
                             ))}
                             {(!masteryItems || masteryItems.length === 0) && (
                                 <div className="text-center py-8 text-muted-foreground">
-                                    No data yet. Go to 'The Gym' to start practicing!
+                                    No data yet. Go to 'Quiz' to start a Knowledge Assessment!
                                 </div>
                             )}
                         </div>
@@ -143,10 +147,105 @@ export function DashboardView() {
                 </div>
             </div>
 
+            {/* Offline Model Widget - moved here since Smart Agent section was removed */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div>
+                    <OfflineAIWidget />
+                </div>
+            </div>
+
             <div className="grid grid-cols-1">
                 <StudyPlanWidget />
             </div>
         </div>
+    );
+}
+
+import { webLLM } from '@/lib/ai/llm-engine';
+import { Progress } from "@/components/ui/progress";
+import { Download, CheckCircle2, Cpu } from 'lucide-react';
+import { RLSchedulerView } from './rl-scheduler-view';
+
+function OfflineAIWidget() {
+    const [progress, setProgress] = useState(0);
+    const [status, setStatus] = useState<'idle' | 'downloading' | 'ready'>('idle');
+    const [text, setText] = useState("");
+
+    useEffect(() => {
+        // Check initial state
+        if (webLLM.isLoaded) setStatus('ready');
+    }, []);
+
+    const startDownload = async () => {
+        setStatus('downloading');
+        try {
+            await webLLM.init((report) => {
+                setProgress(report.progress * 100);
+                setText(report.text);
+            });
+            setStatus('ready');
+        } catch (e: any) {
+            console.error(e);
+            setStatus('idle');
+
+            // Handle GPU specific errors
+            if (e.message?.includes('device') || e.message?.includes('GPU')) {
+                setText("GPU Error: Restart Browser or use Cloud Mode.");
+                toast({
+                    title: "GPU Device Lost",
+                    description: "Your graphics driver crashed. Please restart your browser completely or switch to Cloud Mode.",
+                    variant: "destructive"
+                });
+            } else {
+                setText("Download failed. Check connection.");
+            }
+        }
+    };
+
+    return (
+        <Card className="h-full border-muted/60 shadow-md bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-white">
+                    <Cpu className="w-5 h-5 text-blue-400" />
+                    Offline AI Model
+                </CardTitle>
+                <CardDescription className="text-slate-300">
+                    Phi-3.5 Mini (~2.5GB)
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {status === 'idle' && (
+                    <div className="text-center py-6 space-y-4">
+                        <p className="text-sm text-slate-300">
+                            Download the lightweight model for fast, offline privacy.
+                        </p>
+                        <Button onClick={startDownload} className="w-full bg-blue-600 hover:bg-blue-500 text-white">
+                            <Download className="w-4 h-4 mr-2" />
+                            Download Model
+                        </Button>
+                    </div>
+                )}
+
+                {status === 'downloading' && (
+                    <div className="space-y-4">
+                        <div className="flex justify-between text-xs text-slate-300">
+                            <span>Downloading...</span>
+                            <span>{Math.round(progress)}%</span>
+                        </div>
+                        <Progress value={progress} className="h-2 bg-slate-700" />
+                        <p className="text-xs text-slate-400 truncate">{text}</p>
+                    </div>
+                )}
+
+                {status === 'ready' && (
+                    <div className="flex flex-col items-center justify-center py-8 text-green-400 space-y-2">
+                        <CheckCircle2 className="w-12 h-12" />
+                        <p className="font-semibold text-white">AI Ready to Serve</p>
+                        <p className="text-xs text-slate-400">Running locally on WebGPU</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 }
 

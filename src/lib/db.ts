@@ -37,6 +37,8 @@ export interface LearnerProfile {
     learningStyle: 'visual' | 'text' | 'analogy' | 'auditory';
     preferredTime: 'morning' | 'evening';
     availableHoursPerWeek: number;
+    semester: string; // "1" matched from Onboarding
+    branch: string; // "Computer Science"
     goals: string[]; // From other sources or defaulted
     metrics: {
         streak: number;
@@ -104,6 +106,17 @@ export interface VectorEntry {
     segmentId: number;
 }
 
+export interface NoteEntry {
+    id?: number;
+    title: string;
+    content: string;
+    subject: string;
+    color?: string; // e.g. "bg-yellow-100"
+    createdAt: Date;
+    updatedAt: Date;
+    tags?: string[];
+}
+
 export interface Deck {
     id?: number;
     title: string;
@@ -149,7 +162,9 @@ export class AppDatabase extends Dexie {
     analytics!: EntityTable<AnalyticsEvent, 'id'>;
     flashcardDecks!: EntityTable<Deck, 'id'>;
     flashcards!: EntityTable<Flashcard, 'id'>;
+    flashcards!: EntityTable<Flashcard, 'id'>;
     embeddings!: EntityTable<VectorEntry, 'id'>;
+    notes!: EntityTable<NoteEntry, 'id'>;
 
     constructor() {
         super('MentoraDB');
@@ -179,7 +194,23 @@ export class AppDatabase extends Dexie {
         this.version(6).stores({
             embeddings: '++id, documentId, segmentId'
         });
+
+        // Version 7: Notes
+        this.version(7).stores({
+            notes: '++id, title, subject, updatedAt'
+        });
     }
+}
+
+export interface NoteEntry {
+    id?: number;
+    title: string;
+    content: string;
+    subject: string;
+    color?: string; // e.g. "bg-yellow-100"
+    createdAt: Date;
+    updatedAt: Date;
+    tags?: string[];
 }
 
 export const db = new AppDatabase();

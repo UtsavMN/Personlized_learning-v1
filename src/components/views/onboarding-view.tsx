@@ -73,6 +73,8 @@ export function OnboardingView() {
                 learningStyle: 'visual', // Default, can be refined later
                 preferredTime: preferredTime as 'morning' | 'evening',
                 availableHoursPerWeek: parseInt(studyHours) || 10,
+                semester: semester || '1',
+                branch: branch || 'Undeclared',
                 goals: goals.split('\n').filter(g => g.trim().length > 0),
                 metrics: {
                     streak: 0,

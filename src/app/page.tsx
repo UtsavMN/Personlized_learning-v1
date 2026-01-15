@@ -1,31 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Separator } from '@/components/ui/separator';
 
-import { ChatView } from '@/components/views/chat-view';
-import { CodeView } from '@/components/views/code-view';
-import { MathView } from '@/components/views/math-view';
 import { TimetableView } from '@/components/views/timetable-view';
+import { TrackerView } from '@/components/views/tracker-view';
 import { DocumentView } from '@/components/views/document-view';
 import { DashboardView } from '@/components/views/dashboard-view';
 import { QuizView } from "@/components/views/quiz-view";
 import { FlashcardsView } from "@/components/views/flashcards-view";
-// import { AuthView } from "@/components/views/auth-view";
 import { OnboardingView } from "@/components/views/onboarding-view";
 import { SettingsView } from "@/components/views/settings-view";
-import { GradePredictorView } from "@/components/views/grade-predictor-view";
-import { RLSchedulerView } from "@/components/views/rl-scheduler-view";
+import { SmartAgentView } from "@/components/views/smart-agent-view";
+import { StudioView } from "@/components/views/studio-view";
 import { useLocalAuth } from '@/lib/auth-context';
+import { useSearchParams } from 'next/navigation';
+import { AITutorFloating } from '@/components/widgets/ai-tutor-floating';
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
-import { Loader2 } from "lucide-react";
 
-export default function Dashboard() {
+function DashboardContent() {
   const { isUserLoading, needsOnboarding, user: localUser } = useLocalAuth();
   const { user: clerkUser } = useUser();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('view') || 'dashboard';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Sync tab if URL param changes (e.g. back button)
+  useEffect(() => {
+    const view = searchParams.get('view');
+    if (view && view !== activeTab) {
+      setActiveTab(view);
+    }
+  }, [searchParams]);
 
   // Determine effective user (Clerk or Local/Dev)
   const user = localUser || clerkUser;
@@ -54,15 +64,13 @@ export default function Dashboard() {
     switch (activeTab) {
       case 'dashboard': return <DashboardView />;
       case 'timetable': return <TimetableView />;
+      case 'tracker': return <TrackerView />;
       case 'documents': return <DocumentView />;
-      case 'chat': return <ChatView />;
-      case 'math': return <MathView />;
-      case 'math': return <MathView />;
+      case 'studio': return <StudioView />;
       case 'quiz': return <QuizView />;
       case 'flashcards': return <FlashcardsView />;
-      case 'code': return <CodeView />;
       case 'predictor': return <GradePredictorView />;
-      case 'rl-agent': return <RLSchedulerView />;
+      case 'smart-agent': return <SmartAgentView />;
       case 'settings': return <SettingsView />;
       default: return <DashboardView />;
     }
@@ -72,14 +80,13 @@ export default function Dashboard() {
     const titles: Record<string, string> = {
       dashboard: 'Dashboard',
       timetable: 'Schedule',
+      tracker: 'Tracker (Tasks & Habits)',
       documents: 'Documents',
-      chat: 'AI Tutor',
-      math: 'Math Solver',
+      studio: 'The Lab (Math & Code)',
       quiz: 'Quiz',
       flashcards: 'Pulse (Flashcards)',
       predictor: 'Grade Predictor (Neuro)',
-      'rl-agent': 'Smart Scheduler (Q-Learning)',
-      code: 'Code Lab',
+      'smart-agent': 'Smart Agent (AI Assistant)',
       settings: 'Profile & Settings'
     };
     return titles[tab] || 'Dashboard';
@@ -104,6 +111,15 @@ export default function Dashboard() {
           </div>
         </div>
       </SidebarInset>
+      <AITutorFloating />
     </SidebarProvider>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

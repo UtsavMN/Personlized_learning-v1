@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Brain, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import { studyManager } from "@/lib/ai/study-manager";
 import { useRouter } from 'next/navigation';
+import { FeedbackButtons } from './feedback-buttons';
 
 export function AIRecommendationsWidget() {
     const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -100,6 +101,17 @@ export function AIRecommendationsWidget() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* AI Feedback Loop (Goal 4) */}
+            <div className="flex items-center justify-between px-2 py-1">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold opacity-70">
+                    Reinforcement Signal
+                </span>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Was this helpful?</span>
+                    <FeedbackButtons recId={topRec.id} />
+                </div>
+            </div>
 
             {/* Secondary List */}
             {otherRecs.length > 0 && (

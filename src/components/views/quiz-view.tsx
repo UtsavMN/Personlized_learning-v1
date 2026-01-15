@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle2, XCircle, Trophy, Dumbbell, Flame } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Trophy, BrainCircuit, Target, ArrowRight, BookOpen } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 const quizConfigSchema = z.object({
@@ -108,8 +108,8 @@ export function QuizView() {
             console.error("Quiz Error:", error);
             toast({
                 variant: 'destructive',
-                title: 'Workout Cancelled',
-                description: 'Failed to prepare the gym session. Try again.',
+                title: 'Assessment Generation Failed',
+                description: 'We encountered an error preparing your questions. Please try again.',
             });
             setQuizState('config');
         }
@@ -169,13 +169,13 @@ export function QuizView() {
                 // User Feedback based on adaptation result
                 if (result.levelChange > 0) {
                     toast({
-                        title: "Level Up! 🌟",
+                        title: "Mastery Level Increased! 🌟",
                         description: result.message,
                         className: "bg-green-500 text-white"
                     });
                 } else if (result.levelChange < 0) {
                     toast({
-                        title: "Difficulty Adjusted",
+                        title: "Curriculum Adjusted",
                         description: result.message,
                     });
                 } else {
@@ -198,19 +198,19 @@ export function QuizView() {
                     <Card className="max-w-md w-full border-dashed border-2 shadow-sm bg-muted/30">
                         <CardHeader>
                             <div className="mx-auto bg-muted w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                                <Dumbbell className="w-8 h-8 text-muted-foreground" />
+                                <BookOpen className="w-8 h-8 text-muted-foreground" />
                             </div>
-                            <CardTitle>The Gym is Empty</CardTitle>
+                            <CardTitle>Assessments Unavailable</CardTitle>
                             <CardDescription>
-                                You haven't added any subjects yet.
+                                No subjects found. Please add subjects in your Profile or upload documents first.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <p className="text-sm text-muted-foreground mb-4">
-                                To start practicing, you need to set up your subjects in your profile or upload documents.
+                                The Knowledge Assessment engine requires course material to generate questions.
                             </p>
                             <Button variant="outline" onClick={() => window.location.reload()}>
-                                Check Again
+                                Reload Data
                             </Button>
                         </CardContent>
                     </Card>
@@ -220,13 +220,15 @@ export function QuizView() {
 
         return (
             <div className="h-full flex flex-col items-center justify-center p-4 animate-in zoom-in-95 duration-300">
-                <Card className="w-full max-w-md shadow-xl border-primary/20">
-                    <CardHeader className="text-center pb-2">
+                <Card className="w-full max-w-md shadow-xl border-t-4 border-t-primary">
+                    <CardHeader className="text-center pb-6">
                         <div className="mx-auto bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                            <Dumbbell className="w-8 h-8 text-primary" />
+                            <BrainCircuit className="w-8 h-8 text-primary" />
                         </div>
-                        <CardTitle className="text-2xl font-bold font-headline">The Gym</CardTitle>
-                        <CardDescription>Train your brain. Build your streak.</CardDescription>
+                        <CardTitle className="text-2xl font-bold tracking-tight">Knowledge Assessment</CardTitle>
+                        <CardDescription className="text-base">
+                            Test your command of the material with AI-generated questions.
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Form {...form}>
@@ -236,11 +238,11 @@ export function QuizView() {
                                     name="topic"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Workout Focus</FormLabel>
+                                            <FormLabel className="text-sm font-semibold">Select Topic</FormLabel>
                                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select a topic..." />
+                                                    <SelectTrigger className="h-11">
+                                                        <SelectValue placeholder="Choose a subject..." />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
@@ -260,7 +262,7 @@ export function QuizView() {
                                         name="difficulty"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Intensity</FormLabel>
+                                                <FormLabel className="text-sm font-semibold">Difficulty Level</FormLabel>
                                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                     <FormControl>
                                                         <SelectTrigger>
@@ -268,9 +270,9 @@ export function QuizView() {
                                                         </SelectTrigger>
                                                     </FormControl>
                                                     <SelectContent>
-                                                        <SelectItem value="easy">Warmup (Easy)</SelectItem>
-                                                        <SelectItem value="medium">Sweat (Medium)</SelectItem>
-                                                        <SelectItem value="hard">Max Effort (Hard)</SelectItem>
+                                                        <SelectItem value="easy">Fundamental (Easy)</SelectItem>
+                                                        <SelectItem value="medium">Standard (Med)</SelectItem>
+                                                        <SelectItem value="hard">Complex (Hard)</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                                 <FormMessage />
@@ -282,7 +284,7 @@ export function QuizView() {
                                         name="questionCount"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Reps (Questions)</FormLabel>
+                                                <FormLabel className="text-sm font-semibold">Question Count</FormLabel>
                                                 <Select onValueChange={(val) => field.onChange(val)} defaultValue={String(field.value)}>
                                                     <FormControl>
                                                         <SelectTrigger>
@@ -290,9 +292,9 @@ export function QuizView() {
                                                         </SelectTrigger>
                                                     </FormControl>
                                                     <SelectContent>
-                                                        <SelectItem value="3">3 Reps</SelectItem>
-                                                        <SelectItem value="5">5 Reps</SelectItem>
-                                                        <SelectItem value="10">10 Reps</SelectItem>
+                                                        <SelectItem value="3">3 Questions</SelectItem>
+                                                        <SelectItem value="5">5 Questions</SelectItem>
+                                                        <SelectItem value="10">10 Questions</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                                 <FormMessage />
@@ -301,8 +303,8 @@ export function QuizView() {
                                     />
                                 </div>
 
-                                <Button type="submit" className="w-full text-lg h-12">
-                                    Start Workout
+                                <Button type="submit" className="w-full text-base font-semibold h-12 shadow-md hover:shadow-lg transition-all">
+                                    Start Assessment <ArrowRight className="w-4 h-4 ml-2" />
                                 </Button>
                             </form>
                         </Form>
@@ -314,10 +316,17 @@ export function QuizView() {
 
     if (quizState === 'loading') {
         return (
-            <div className="h-full flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <h3 className="text-xl font-semibold animate-pulse">Preparing your personalized session...</h3>
-                <p className="text-muted-foreground text-sm">Analyzing your documents and weak points.</p>
+            <div className="h-full flex flex-col items-center justify-center space-y-6">
+                <div className="relative">
+                    <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+                    <Loader2 className="relative h-16 w-16 animate-spin text-primary" />
+                </div>
+                <div className="text-center space-y-2">
+                    <h3 className="text-2xl font-bold tracking-tight">Generating Assessment...</h3>
+                    <p className="text-muted-foreground max-w-xs">
+                        Our AI is analyzing your documents to create a personalized test.
+                    </p>
+                </div>
             </div>
         );
     }
@@ -326,30 +335,38 @@ export function QuizView() {
         const percentage = Math.round((score / activeQuestions.length) * 100);
         return (
             <div className="h-full flex items-center justify-center p-4 animate-in zoom-in-95 duration-500">
-                <Card className="w-full max-w-2xl border-primary/20 shadow-2xl">
-                    <CardHeader className="text-center">
-                        <div className="mx-auto mb-4 bg-green-100 dark:bg-green-900/30 w-20 h-20 rounded-full flex items-center justify-center">
-                            <Trophy className="w-10 h-10 text-green-600 dark:text-green-400" />
+                <Card className="w-full max-w-3xl border-0 shadow-2xl bg-gradient-to-br from-card to-muted/20">
+                    <CardHeader className="text-center border-b pb-8">
+                        <div className="mx-auto mb-4 bg-primary/10 w-24 h-24 rounded-full flex items-center justify-center shadow-inner">
+                            <Trophy className="w-12 h-12 text-primary" />
                         </div>
-                        <CardTitle className="text-3xl font-bold">Session Complete!</CardTitle>
-                        <CardDescription className="text-lg">
-                            You scored <span className="font-bold text-primary">{percentage}%</span>
+                        <CardTitle className="text-4xl font-bold mb-2">Assessment Complete</CardTitle>
+                        <CardDescription className="text-xl">
+                            You scored <span className="font-bold text-foreground">{percentage}%</span>
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
+                    <CardContent className="space-y-6 pt-8 max-h-[500px] overflow-y-auto">
                         <div className="grid gap-4">
                             {activeQuestions.map((q, idx) => {
                                 const userAnswer = answers[q.id!];
                                 const isCorrect = userAnswer === q.correctAnswer;
                                 return (
-                                    <div key={q.id} className={`p-4 rounded-lg border ${isCorrect ? 'bg-green-500/5 border-green-200 dark:border-green-900' : 'bg-red-500/5 border-red-200 dark:border-red-900'}`}>
-                                        <div className="flex items-start gap-3">
-                                            {isCorrect ? <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" /> : <XCircle className="w-5 h-5 text-red-600 mt-0.5" />}
-                                            <div className="space-y-1">
-                                                <p className="font-medium text-sm">{idx + 1}. {q.question}</p>
-                                                <p className="text-xs text-muted-foreground">Correct: {q.correctAnswer}</p>
-                                                {!isCorrect && <p className="text-xs text-red-500">Your Answer: {userAnswer}</p>}
-                                                {q.explanation && <p className="text-xs text-muted-foreground mt-2 italic bg-muted/50 p-2 rounded">Note: {q.explanation}</p>}
+                                    <div key={q.id} className={`p-5 rounded-xl border transition-all ${isCorrect ? 'bg-green-500/5 border-green-200 dark:border-green-900/50' : 'bg-red-500/5 border-red-200 dark:border-red-900/50'}`}>
+                                        <div className="flex items-start gap-4">
+                                            <div className="mt-1">
+                                                {isCorrect ? <CheckCircle2 className="w-6 h-6 text-green-600 shadow-sm" /> : <XCircle className="w-6 h-6 text-red-600 shadow-sm" />}
+                                            </div>
+                                            <div className="space-y-2 flex-1">
+                                                <p className="font-semibold text-lg leading-snug">{idx + 1}. {q.question}</p>
+                                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-8 pt-2">
+                                                    <p className="text-sm text-muted-foreground font-medium">Correct Answer: <span className="text-green-600 dark:text-green-400">{q.correctAnswer}</span></p>
+                                                    {!isCorrect && <p className="text-sm text-red-600 dark:text-red-400 font-medium">Your Answer: {userAnswer}</p>}
+                                                </div>
+                                                {q.explanation && (
+                                                    <div className="text-sm text-muted-foreground mt-3 bg-muted/50 p-3 rounded-lg border border-border/50">
+                                                        <span className="font-semibold">Explanation:</span> {q.explanation}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -357,9 +374,9 @@ export function QuizView() {
                             })}
                         </div>
                     </CardContent>
-                    <CardFooter className="flex justify-center gap-4 pb-8">
-                        <Button variant="outline" onClick={() => setQuizState('config')}>Back to Gym</Button>
-                        <Button onClick={() => setQuizState('config')}>Start New Session</Button>
+                    <CardFooter className="flex justify-center gap-4 py-8 border-t bg-muted/5">
+                        <Button variant="outline" size="lg" onClick={() => setQuizState('config')}>Back to Menu</Button>
+                        <Button size="lg" onClick={() => setQuizState('config')}>Take Another Test</Button>
                     </CardFooter>
                 </Card>
             </div>
@@ -367,55 +384,82 @@ export function QuizView() {
     }
 
     // Active Quiz View
-    // Safety check
     if (!activeQuestions || activeQuestions.length === 0 || currentQuestionIndex >= activeQuestions.length) {
         return (
             <div className="h-full flex items-center justify-center">
-                <div className="text-center">
-                    <p>Something went wrong.</p>
-                    <Button onClick={() => setQuizState('config')} className="mt-4">Return to Menu</Button>
+                <div className="text-center space-y-4">
+                    <p className="text-lg text-muted-foreground">Session Error</p>
+                    <Button onClick={() => setQuizState('config')}>Return to Menu</Button>
                 </div>
             </div>
         );
     }
 
     const currentQ = activeQuestions[currentQuestionIndex];
-    const progress = ((currentQuestionIndex) / activeQuestions.length) * 100;
+    const progress = ((currentQuestionIndex + 1) / activeQuestions.length) * 100;
 
     return (
-        <div className="max-w-3xl mx-auto h-full flex flex-col py-6 px-4">
+        <div className="max-w-4xl mx-auto h-full flex flex-col py-8 px-4 sm:px-6">
             {/* Quiz Header */}
-            <div className="mb-8 space-y-2">
-                <div className="flex justify-between items-center text-sm text-muted-foreground">
-                    <span>Question {currentQuestionIndex + 1} of {activeQuestions.length}</span>
-                    <span className="flex items-center text-orange-500"><Flame className="w-4 h-4 mr-1" /> High Intensity</span>
+            <div className="mb-8 space-y-4">
+                <div className="flex justify-between items-end text-sm text-muted-foreground">
+                    <div>
+                        <span className="text-2xl font-bold text-foreground">Question {currentQuestionIndex + 1}</span>
+                        <span className="ml-2">/ {activeQuestions.length}</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-xs font-semibold uppercase tracking-wider">
+                        <Target className="w-4 h-4" /> Focus Mode
+                    </div>
                 </div>
-                <Progress value={progress} className="h-2" />
+                <Progress value={progress} className="h-3 rounded-full" />
             </div>
 
             {/* Question Card */}
-            <Card className="flex-1 flex flex-col shadow-lg border-muted/60">
-                <CardHeader>
-                    <CardTitle className="text-xl leading-relaxed">{currentQ.question}</CardTitle>
+            <Card className="flex-1 flex flex-col shadow-lg border-muted/60 overflow-hidden">
+                <CardHeader className="bg-muted/5 pb-8 pt-6">
+                    <CardTitle className="text-2xl leading-relaxed font-medium">{currentQ.question}</CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1">
+                <CardContent className="flex-1 p-6 sm:p-8">
                     <RadioGroup onValueChange={handleAnswer} value={answers[currentQ.id!] || ""}>
-                        <div className="grid gap-3">
+                        <div className="grid gap-4">
                             {currentQ.options.map((option, idx) => (
-                                <div key={idx} className={`flex items-center space-x-2 border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors ${answers[currentQ.id!] === option ? 'border-primary bg-primary/5' : ''}`}>
-                                    <RadioGroupItem value={option} id={`opt-${idx}`} />
-                                    <Label htmlFor={`opt-${idx}`} className="flex-1 cursor-pointer font-normal text-base">{option}</Label>
+                                <div
+                                    key={idx}
+                                    onClick={() => handleAnswer(option)}
+                                    className={`
+                                        flex items-center space-x-4 border-2 rounded-xl p-5 cursor-pointer transition-all duration-200
+                                        ${answers[currentQ.id!] === option
+                                            ? 'border-primary bg-primary/5 shadow-md scale-[1.01]'
+                                            : 'border-muted hover:border-primary/50 hover:bg-muted/30'
+                                        }
+                                    `}
+                                >
+                                    <RadioGroupItem value={option} id={`opt-${idx}`} className="w-5 h-5 mt-0.5" />
+                                    <Label htmlFor={`opt-${idx}`} className="flex-1 cursor-pointer font-normal text-lg leading-relaxed pointer-events-none">
+                                        {option}
+                                    </Label>
                                 </div>
                             ))}
                         </div>
                     </RadioGroup>
                 </CardContent>
-                <CardFooter className="border-t bg-muted/10 p-6 flex justify-between items-center">
-                    <Button variant="ghost" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex(prev => prev - 1)}>
+                <CardFooter className="border-t bg-muted/5 p-6 flex justify-between items-center sm:px-8">
+                    <Button
+                        variant="ghost"
+                        size="lg"
+                        disabled={currentQuestionIndex === 0}
+                        onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                        className="text-muted-foreground hover:text-foreground"
+                    >
                         Previous
                     </Button>
-                    <Button onClick={nextQuestion} disabled={!answers[currentQ.id!]}>
-                        {currentQuestionIndex === activeQuestions.length - 1 ? "Finish Workout" : "Next Rep"}
+                    <Button
+                        size="lg"
+                        onClick={nextQuestion}
+                        disabled={!answers[currentQ.id!]}
+                        className="px-8 font-semibold shadow-md hover:shadow-lg transition-all"
+                    >
+                        {currentQuestionIndex === activeQuestions.length - 1 ? "Complete Assessment" : "Next Question"}
                     </Button>
                 </CardFooter>
             </Card>

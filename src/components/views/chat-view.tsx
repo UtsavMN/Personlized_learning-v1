@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '@/component
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatMessage } from '@/components/chat-message';
-import { Loader2, Send, Trash2, Cpu, Download } from 'lucide-react';
+import { Loader2, Send, Trash2, Cpu, Download, BookText } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -30,9 +30,10 @@ const formSchema = z.object({
   documentId: z.string().min(1, 'Please select a document.'),
 });
 
-export function ChatView() {
+export function ChatView({ isFloating = false }: { isFloating?: boolean }) {
   const [mode, setMode] = useState<'local' | 'cloud'>('local');
-  const [isModelReady, setIsModelReady] = useState(false);
+  // Initialize from global state to fix sync issue
+  const [isModelReady, setIsModelReady] = useState(webLLM.isLoaded);
   const [initProgress, setInitProgress] = useState(0);
   const [initText, setInitText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -154,23 +155,30 @@ export function ChatView() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 h-full">
-      <Card className="lg:col-span-2 h-full flex flex-col shadow-lg border-2 border-primary/10">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-muted/20">
-          <div className="flex flex-col space-y-1.5">
-            <CardTitle className="flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-purple-500" />
-              Local AI Tutor
-            </CardTitle>
-            <CardDescription>
-              Running Llama-3-8B directly in your browser (WebGPU).
-            </CardDescription>
-          </div>
-          <Button variant="ghost" size="sm" onClick={clearChat} className="text-muted-foreground hover:text-destructive">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear
-          </Button>
-        </CardHeader>
+    <div className={isFloating ? "flex flex-col h-full" : "grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 h-full"}>
+      <Card className={`h-full flex flex-col shadow-lg border-2 border-primary/10 ${isFloating ? 'border-0 shadow-none' : 'lg:col-span-2'}`}>
+        {!isFloating && (
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-muted/20">
+            <div className="flex flex-col space-y-1.5">
+              <CardTitle className="flex items-center gap-2">
+                <BookText className="w-5 h-5 text-primary" />
+                AI Tutor
+                {!webLLM.isLoaded && (
+                  <span className="text-xs font-normal text-destructive bg-destructive/10 px-2 py-0.5 rounded ml-2">
+                    Offline Model Not Ready
+                  </span>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Running Llama-3-8B directly in your browser (WebGPU).
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={clearChat} className="text-muted-foreground hover:text-destructive">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear
+            </Button>
+          </CardHeader>
+        )}
 
         {/* content area */}
         <CardContent className="flex-grow flex flex-col gap-4 p-0">
@@ -192,8 +200,8 @@ export function ChatView() {
 
               {(!messages || messages.length === 0) && (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground opacity-50 space-y-4">
-                  <Cpu className="w-16 h-16" />
-                  <p>No messages yet. Pick a document and start chatting.</p>
+                  <Cpu className="w-12 h-12" />
+                  <p className="text-sm text-center px-4">Ready to help using {mode === 'local' ? 'WebGPU' : 'Cloud'}.</p>
                 </div>
               )}
             </div>
@@ -207,64 +215,65 @@ export function ChatView() {
                 <div className="flex items-center justify-between">
                   <span className="font-semibold flex items-center gap-2">
                     <Download className="w-4 h-4" />
-                    Model Download Required (~4GB)
+                    Model Required
                   </span>
                   <span className="text-xs text-muted-foreground">{Math.round(initProgress)}%</span>
                 </div>
-                <Progress value={initProgress} className="h-2" />
-                <p className="text-xs text-muted-foreground truncate">{initText || "Click Send to initialize download..."}</p>
+                {initProgress > 0 && <Progress value={initProgress} className="h-2" />}
               </div>
             )}
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="documentId"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-1">
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Context..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {documents?.map((doc) => (
-                              <SelectItem key={doc.id} value={String(doc.id)}>{doc.title}</SelectItem>
-                            ))}
-                            <SelectItem value="none">General Chat (No Context)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Mode Selection */}
-                  <div className="md:col-span-1">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <FormField
+                      control={form.control}
+                      name="documentId"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Context..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {documents?.map((doc) => (
+                                <SelectItem key={doc.id} value={String(doc.id)}>{doc.title}</SelectItem>
+                              ))}
+                              <SelectItem value="none">No Context</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
                     <Select value={mode} onValueChange={(v: 'local' | 'cloud') => setMode(v)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-[80px] h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="local">Local (WebLLM)</SelectItem>
-                        <SelectItem value="cloud">Cloud (Gemini)</SelectItem>
+                        <SelectItem value="local">Local</SelectItem>
+                        <SelectItem value="cloud">Cloud</SelectItem>
                       </SelectContent>
                     </Select>
+                    <Button variant="ghost" size="icon" type="button" onClick={clearChat} className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Clear Chat">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
+
 
                   <FormField
                     control={form.control}
                     name="query"
                     render={({ field }) => (
-                      <FormItem className="md:col-span-2">
+                      <FormItem>
                         <FormControl>
                           <div className="relative flex items-center gap-2">
                             <Input
                               placeholder="Ask anything..."
                               {...field}
-                              className="pr-12"
+                              className="pr-10"
                               disabled={isGenerating}
                               autoComplete="off"
                             />
@@ -272,7 +281,7 @@ export function ChatView() {
                               type="submit"
                               size="icon"
                               disabled={isGenerating}
-                              className={mode === 'local' && !isModelReady ? "animate-pulse" : ""}
+                              className={`absolute right-1 top-1 h-8 w-8 ${mode === 'local' && !isModelReady ? "animate-pulse" : ""}`}
                             >
                               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                             </Button>
@@ -288,51 +297,28 @@ export function ChatView() {
         </CardContent>
       </Card>
 
-      {/* Sidebar Info */}
-      <div className="lg:col-span-1 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Mode</span>
-              <span className="font-mono bg-muted px-2 py-1 rounded capitalize">{mode}</span>
-            </div>
-            {mode === 'local' && (
+      {/* Sidebar Info - Hidden in Floating Mode */}
+      {!isFloating && (
+        <div className="lg:col-span-1 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>System Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Engine</span>
-                <span className="font-mono bg-muted px-2 py-1 rounded">WebGPU</span>
+                <span className="text-muted-foreground">Mode</span>
+                <span className="font-mono bg-muted px-2 py-1 rounded capitalize">{mode}</span>
               </div>
-            )}
-            {mode === 'cloud' && (
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Provider</span>
-                <span className="font-mono bg-muted px-2 py-1 rounded">Gemini</span>
+                <span className="text-muted-foreground">Status</span>
+                <span className={`px-2 py-1 rounded font-medium ${isModelReady || mode === 'cloud' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100'}`}>
+                  {mode === 'local' ? (isModelReady ? 'Ready' : 'Standby') : 'Online'}
+                </span>
               </div>
-            )}
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Status</span>
-              <span className={`px-2 py-1 rounded font-medium ${isModelReady || mode === 'cloud' ? 'text-green-600 bg-green-100' : 'text-yellow-600 bg-yellow-100'}`}>
-                {mode === 'local' ? (isModelReady ? 'Ready' : 'Standby') : 'Online'}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 border-none">
-          <CardContent className="pt-6">
-            <h4 className="font-semibold mb-2 flex items-center gap-2">
-              <Cpu className="w-4 h-4" />
-              Offline Capable
-            </h4>
-            <p className="text-xs text-muted-foreground">
-              This chat runs entirely on your device. No data leaves your computer.
-              Perfect for private study sessions.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
