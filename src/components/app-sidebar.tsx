@@ -40,6 +40,7 @@ import { useLocalAuth } from '@/lib/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { FactoryResetWidget } from '@/components/factory-reset';
+import { useRouter } from 'next/navigation';
 
 export function AppSidebar({
     activeTab,
@@ -50,6 +51,7 @@ export function AppSidebar({
 }) {
     const { user, logout } = useLocalAuth();
     const { isMobile } = useSidebar();
+    const router = useRouter();
 
     const items = [
         {
@@ -102,7 +104,10 @@ export function AppSidebar({
                                     <SidebarMenuItem key={item.value}>
                                         <SidebarMenuButton
                                             isActive={activeTab === item.value}
-                                            onClick={() => onTabChange(item.value)}
+                                            onClick={() => {
+                                                onTabChange(item.value); // Optimistic update
+                                                router.push(`/?view=${item.value}`);
+                                            }}
                                             tooltip={item.title}
                                         >
                                             <item.icon />
@@ -145,25 +150,10 @@ export function AppSidebar({
     );
 }
 
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/lib/db";
+import { useGamification } from '@/hooks/use-gamification';
 
 function GamificationStats() {
-    const stats = useLiveQuery(async () => {
-        const mastery = await db.subjectMastery.toArray();
-        const totalXP = mastery.reduce((sum: number, item: any) => sum + (item.xp || 0), 0);
-
-        // Simple Level Formula: Level = Floor(Sqrt(XP / 100)) + 1
-        // Level 1: 0-99, Level 2: 100-399, Level 3: 400-899
-        let level = Math.floor(Math.sqrt(totalXP / 100)) + 1;
-
-        // Calculate progress to next level
-        const nextLevelXP = Math.pow(level, 2) * 100;
-        const prevLevelXP = Math.pow(level - 1, 2) * 100;
-        const progress = ((totalXP - prevLevelXP) / (nextLevelXP - prevLevelXP)) * 100;
-
-        return { totalXP, level, progress };
-    });
+    const { stats } = useGamification();
 
     if (!stats) return null;
 

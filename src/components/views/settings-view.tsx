@@ -14,12 +14,13 @@ import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { useDelete } from '@/hooks/use-delete';
 
 export function SettingsView() {
     const { user } = useLocalAuth();
 
     return (
-        <div className="p-6 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+        <div className="p-6 max-w-4xl mx-auto space-y-8">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Settings & Profile</h1>
                 <p className="text-muted-foreground mt-2">Manage your account and data preferences.</p>
@@ -213,26 +214,24 @@ function ProfileEditor() {
         }
     };
 
+    const { deleteItem } = useDelete();
+
     const confirmDelete = async () => {
         if (!deleteCandidate) return;
         const item = deleteCandidate;
 
-        try {
+        deleteItem(async () => {
             if (item.id) {
                 await db.subjectMastery.delete(item.id);
             } else if (item.topicId) {
-                // Fallback delete by topicId
                 await db.subjectMastery.where('topicId').equals(item.topicId).delete();
             } else {
                 throw new Error("Could not identify subject to delete.");
             }
-            toast({ title: "Subject Removed" });
-        } catch (e: any) {
-            console.error("Remove Subject Error:", e);
-            toast({ title: "Error", description: "Failed to remove subject: " + e.message, variant: "destructive" });
-        } finally {
-            setDeleteCandidate(null);
-        }
+        }, {
+            successMessage: "Subject Removed",
+            onSuccess: () => setDeleteCandidate(null)
+        });
     };
 
     if (!profile) return <Card className="animate-pulse h-[300px]"><CardHeader><CardTitle>Loading Profile...</CardTitle></CardHeader></Card>;

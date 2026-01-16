@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, MoreVertical, Trash2, Palette, Tag, PenLine, StickyNote, Grid, List } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useDelete } from '@/hooks/use-delete';
 
 const COLORS = [
     { name: 'Default', value: 'bg-card' },
@@ -83,8 +84,10 @@ export function NotesView() {
         setIsCreateOpen(true);
     };
 
-    const handleDelete = async (id?: number) => {
-        if (id) await db.notes.delete(id);
+    const { deleteItem } = useDelete();
+
+    const handleDelete = (id?: number) => {
+        if (id) deleteItem(async () => await db.notes.delete(id), { successMessage: "Note deleted" });
     };
 
     return (
@@ -151,7 +154,7 @@ export function NotesView() {
                                 </div>
                                 <p className="text-sm text-foreground/80 whitespace-pre-wrap line-clamp-[10]">{note.content}</p>
 
-                                <div className="mt-4 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="mt-4 flex justify-between items-center text-muted-foreground">
                                     <span className="text-xs text-muted-foreground">{format(note.updatedAt, 'MMM d')}</span>
                                     <Button
                                         variant="ghost"

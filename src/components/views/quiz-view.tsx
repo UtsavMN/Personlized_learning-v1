@@ -12,6 +12,8 @@ import { updateTopicMastery } from '@/lib/adaptation/engine';
 import { trackEvent } from '@/lib/tracking/analytics';
 
 import { Button } from '@/components/ui/button';
+import { generateQuizLocal } from '@/lib/ai/local-flows';
+import { webLLM } from '@/lib/ai/llm-engine';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,6 +35,7 @@ export function QuizView() {
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({}); // { questionId: selectedOption }
     const [score, setScore] = useState(0);
+    const [modelProgress, setModelProgress] = useState('');
 
     // Data fetching
     const subjectMastery = useLiveQuery(() => db.subjectMastery.toArray());
@@ -55,38 +58,52 @@ export function QuizView() {
     const startQuiz = async (data: z.infer<typeof quizConfigSchema>) => {
         setQuizState('loading');
         try {
-            // 1. Fetch relevant documents for RAG context
-            const documents = await db.documents
-                .filter(doc => doc.subject?.toLowerCase().trim() === data.topic.toLowerCase().trim() ||
-                    doc.title.toLowerCase().includes(data.topic.toLowerCase()))
-                .toArray();
+            // 1. RAG Retrieval (Semantic Search)
+            // Import dynamically to avoid SSR issues with transformers.js
+            // Import dynamically to avoid SSR issues with transformers.js
+            const { searchSimilarChunks } = await import('@/lib/ai/rag-pipeline');
 
-            // STRICT GATING: No documents = No Quiz
-            if (documents.length === 0) {
-                setQuizState('config'); // Go back
-                toast({
-                    title: "Missing Study Materials",
-                    description: `You have no documents for "${data.topic}". Please upload PDF notes first.`,
-                    variant: "destructive"
-                });
-                return;
+            // Initialize Local Brain
+            if (!webLLM.isLoaded) {
+                toast({ title: "Activating Brain...", description: "Loading AI Model (One-time setup)" });
+                await webLLM.init((report) => setModelProgress(report.text));
             }
 
-            // Track Start
-            trackEvent('quiz_start', { topicId: data.topic, data: { difficulty: data.difficulty } });
+            toast({ title: "Searching materials...", description: `Finding relevant content for ${data.topic}` });
 
-            // 2. Call Server Action
-            const contextStrings = documents.map(d => `Title: ${d.title}\n\n${d.content || d.description}`);
+            const chunks = await searchSimilarChunks(data.topic, 15); // Get top 15 relevant segments
+
+            // Allow quiz even if no chunks found (Fallback to General Knowledge or Synthetic)
+            // But warning user is good.
+            if (chunks.length === 0) {
+                toast({
+                    title: "No Materials Found",
+                    description: "We couldn't find specific notes on this topic. Using general knowledge.",
+                    variant: "destructive"
+                });
+            }
+
+            const contextStrings = chunks.map(c => c.text);
+            const fullContext = contextStrings.join('\n\n');
+
+            // Validate Context Quality
+            if (fullContext.length < 500) {
+                toast({
+                    title: "Low Information Density",
+                    description: "The retrieved notes are too short. Quiz quality might be low.",
+                    variant: "destructive"
+                });
+            }
 
             // Generate Quiz
-            const result = await generateQuizAction(data.topic, data.difficulty, data.questionCount, contextStrings) as any;
+            const resultQuestions = await generateQuizLocal(data.topic, fullContext, data.questionCount);
 
-            if (!result.questions || result.questions.length === 0) {
+            if (!resultQuestions || resultQuestions.length === 0) {
                 throw new Error("No questions generated.");
             }
 
             // 3. Save to local DB (cache) with synthetic source
-            const questionsToAdd = result.questions.map((q: any) => ({
+            const questionsToAdd = resultQuestions.map((q: any) => ({
                 ...q,
                 topicId: data.topic,
                 difficulty: data.difficulty,
@@ -324,8 +341,13 @@ export function QuizView() {
                 <div className="text-center space-y-2">
                     <h3 className="text-2xl font-bold tracking-tight">Generating Assessment...</h3>
                     <p className="text-muted-foreground max-w-xs">
-                        Our AI is analyzing your documents to create a personalized test.
+                        Our local AI is analyzing your documents to create a personalized test.
                     </p>
+                    {modelProgress && (
+                        <p className="text-xs text-muted-foreground/70 animate-pulse truncate max-w-sm mx-auto">
+                            {modelProgress}
+                        </p>
+                    )}
                 </div>
             </div>
         );

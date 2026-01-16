@@ -12,7 +12,7 @@ try {
   console.warn('Genkit initialization warning:', error?.message || error);
   // Allow app to run without Genkit if API key is missing
   aiInstance = genkit({
-    model: 'googleai/gemini-1.5-flash',
+    model: 'googleai/gemini-1.5-flash-latest',
   });
 }
 

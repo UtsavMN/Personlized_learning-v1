@@ -50,39 +50,31 @@ export const generateQuizFlow = ai.defineFlow(
 
         try {
             // Mock / Dev Mode Bypass for NO API KEY environment
-            const shouldUseMock = process.env.NODE_ENV === 'development' || !process.env.GOOGLE_GENAI_API_KEY; // Extend logic as needed
+            const shouldUseMock = !process.env.GOOGLE_GENAI_API_KEY; // Extend logic as needed
 
             if (shouldUseMock) {
                 console.log("Using Mock AI for Quiz (Dev/NoKey)");
                 // Simulate delay
-                await new Promise(r => setTimeout(r, 1500));
+                await new Promise(r => setTimeout(r, 1000));
 
-                return {
-                    questions: [
-                        {
-                            question: `[MOCK] What defines '${topic}'?`,
-                            options: ["Option A", "Option B", "Option C", "Option D"],
-                            correctAnswer: "Option A",
-                            explanation: `(Mock) Explanation for ${topic}.`
-                        },
-                        {
-                            question: `[MOCK] Which concept relates to '${topic}'?`,
-                            options: ["Concept X", "Concept Y", "Concept Z", "None"],
-                            correctAnswer: "Concept X",
-                            explanation: "Mock explanation."
-                        },
-                        {
-                            question: `[MOCK] Advanced query on '${topic}'?`,
-                            options: ["True", "False", "Maybe", "Unknown"],
-                            correctAnswer: "True",
-                            explanation: "Mock explanation."
-                        }
-                    ].slice(0, count)
-                };
+                // Dynamic Mock Generation
+                const mockQuestions = Array.from({ length: count }).map((_, i) => ({
+                    question: `[MOCK Q${i + 1}] What is a key concept in ${topic}? (Difficulty: ${difficulty})`,
+                    options: [
+                        `Concept A (Correct)`,
+                        `Concept B (Wrong)`,
+                        `Concept C (Wrong)`,
+                        `Concept D (Wrong)`
+                    ],
+                    correctAnswer: `Concept A (Correct)`,
+                    explanation: `This is a mock explanation for question ${i + 1} about ${topic}.`
+                }));
+
+                return { questions: mockQuestions };
             }
 
             const { output } = await ai.generate({
-                model: 'googleai/gemini-1.5-flash',
+                model: 'googleai/gemini-1.5-flash-latest',
                 prompt: prompt,
                 output: { schema: GenerateQuizOutput },
             });
@@ -94,29 +86,15 @@ export const generateQuizFlow = ai.defineFlow(
         } catch (e) {
             console.error("Quiz Gen Error (Server):", e);
 
-            // Emergency Fallback: Synthetic Questions
-            const emergencyQuestions = [
-                {
-                    question: `What is the limit of (sin x)/x as x approaches 0? (Topic: ${topic})`,
-                    options: ["0", "1", "Infinity", "Undefined"],
-                    correctAnswer: "1",
-                    explanation: "This is a standard limit identity."
-                },
-                {
-                    question: `If f(x) = x^2, what is f'(x)? (Topic: ${topic})`,
-                    options: ["x", "2x", "x^2", "2"],
-                    correctAnswer: "2x",
-                    explanation: "The power rule d/dx(x^n) = nx^(n-1)."
-                },
-                {
-                    question: `Which data structure uses LIFO? (Topic: ${topic})`,
-                    options: ["Queue", "Stack", "Array", "Tree"],
-                    correctAnswer: "Stack",
-                    explanation: "Stack is Last-In-First-Out."
-                }
-            ];
+            // Emergency Fallback: Synthetic Questions (Dynamic Count)
+            const fallbackQuestions = Array.from({ length: count }).map((_, i) => ({
+                question: `Fallback Question ${i + 1}: Basic ${topic} Concept`,
+                options: ["True", "False", "Maybe", "Unknown"],
+                correctAnswer: "True",
+                explanation: "This is a fallback question generated strictly by rule."
+            }));
 
-            return { questions: emergencyQuestions };
+            return { questions: fallbackQuestions };
         }
     }
 );

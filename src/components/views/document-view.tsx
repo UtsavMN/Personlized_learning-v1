@@ -13,8 +13,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, FileUp, FileText, Trash2, Download, CloudUpload, FileType } from 'lucide-react';
+import { Loader2, FileUp, FileText, Trash2, Download, CloudUpload, FileType, Sparkles, MessageSquare, Scan } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
+import { summarizeDocumentAction } from '@/app/actions/ai';
+import { useDelete } from '@/hooks/use-delete';
+import dynamic from 'next/dynamic';
+
+const SmartScanner = dynamic(() => import('../smart-scanner').then(mod => mod.SmartScanner), {
+  ssr: false,
+  loading: () => null
+});
 
 const ACCEPTED_FILE_TYPES = ['application/pdf'];
 
@@ -39,6 +47,7 @@ export function DocumentView() {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [selectedDocForScan, setSelectedDocForScan] = useState<any | null>(null);
 
   // Live query from Dexie
   const documents = useLiveQuery(() => db.documents.toArray());
@@ -61,47 +70,40 @@ export function DocumentView() {
       setIsUploading(true);
       const file = data.documentFile[0];
 
-      // 1. Parse PDF Client-Side
-      let extractedText = '';
-      try {
-        const { extractTextFromPdf } = await import('@/lib/pdf-client');
-        extractedText = await extractTextFromPdf(file);
-      } catch (e) {
-        console.warn('Text extraction failed:', e);
-        extractedText = '';
-        toast({
-          title: "Warning",
-          description: "Could not extract text. AI features will be limited.",
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "Processing Document...",
+        description: "Analyzing structure, images, and content."
+      });
 
-      // 2. Save to Dexie
+      // Import the new engine dynamically
+      const { ingestDocument } = await import('@/lib/ai/rag-pipeline');
+
+      // Perform Ingestion
+      const result = await ingestDocument(file, Date.now()); // Using Date.now() as temp ID before saving doc? 
+      // Actually we should save doc first to get ID, or update ID strategy. 
+      // Local Dexie uses auto-increment.
+
+      // Let's safe doc first to get ID
       const docId = await db.documents.add({
-        title: data.title,
-        description: data.description || '',
+        title: data.title || file.name.replace('.pdf', ''),
         subject: data.subject,
-        content: extractedText,
+        description: data.description || '',
+        content: '', // Will be filled? Or we stick to chunks?
         file: file,
         createdAt: new Date(),
         size: file.size,
-        type: file.type
+        type: file.type,
+        processed: true // Mark as processed by RAG
       });
 
-      // 3. Index for RAG (Background)
-      if (extractedText) {
-        toast({ title: 'Indexing...', description: 'AI is reading your document.' });
-        // Dynamically import to avoid loading ML libs on initial render
-        import('@/lib/ai/vector-store').then(({ vectorStore }) => {
-          vectorStore.addDocument(docId as number, extractedText).then(() => {
-            toast({ title: 'Ready!', description: 'Document indexed for AI.' });
-          });
-        });
-      }
+      // Now Ingest with real ID
+      await ingestDocument(file, docId);
+
+      // Metadata already saved above
 
       toast({
-        title: 'Document Saved!',
-        description: 'Your document has been stored locally.',
+        title: 'Document Intelligence Ready',
+        description: 'Deep analysis complete. Structure and figures extracted.',
       });
 
       form.reset();
@@ -118,11 +120,13 @@ export function DocumentView() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this document?')) {
-      await db.documents.delete(id);
-      toast({ title: 'Document deleted' });
-    }
+  const { deleteItem } = useDelete();
+
+  const handleDelete = (id: number) => {
+    deleteItem(async () => await db.documents.delete(id), {
+      successMessage: 'Document deleted',
+      confirmMessage: 'Are you sure you want to delete this document?'
+    });
   };
 
   const handleDownload = (doc: any) => {
@@ -296,7 +300,7 @@ export function DocumentView() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors"
                             onClick={() => doc.id && handleDelete(doc.id)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -307,14 +311,50 @@ export function DocumentView() {
                             {doc.description || "No description provided."}
                           </p>
                         </CardContent>
-                        <CardFooter className="p-2 bg-muted/30 flex justify-between">
+                        <CardFooter className="p-2 bg-muted/30 flex justify-between items-center gap-1">
                           <span className="text-[10px] text-muted-foreground px-2">
                             {(doc.size / 1024 / 1024).toFixed(1)} MB
                           </span>
-                          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleDownload(doc)}>
-                            <Download className="h-3 w-3 mr-1" />
-                            Download
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" className="h-6 text-xs px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                              onClick={async () => {
+                                toast({ title: "Summarizing...", description: "Asking AI to summarize this document." });
+                                if (doc.content) {
+                                  const res = await summarizeDocumentAction(doc.content.substring(0, 1500)); // Limit for speed and to respect API limits
+                                  if (res.success && res.summary) {
+                                    alert(res.summary); // Simple alert for now, TODO: Modal
+                                    // Update description
+                                    if (doc.id) {
+                                      await db.documents.update(doc.id, { description: res.summary });
+                                      toast({ title: "Updated", description: "Document description updated with AI summary." });
+                                    }
+                                  } else {
+                                    toast({ variant: "destructive", title: "Error", description: res.error });
+                                  }
+                                } else {
+                                  toast({ variant: "destructive", title: "No Content", description: "Document content is empty." });
+                                }
+                              }}
+                            >
+                              <Sparkles className="h-3 w-3 mr-1" />
+                              Summarize
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-6 text-xs px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                              onClick={() => {
+                                if (doc.file) {
+                                  setSelectedDocForScan(doc);
+                                } else {
+                                  toast({ variant: "destructive", title: "Unavailable", description: "Original file not found for scanning." });
+                                }
+                              }}
+                            >
+                              <Scan className="h-3 w-3 mr-1" />
+                              Scan
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => handleDownload(doc)}>
+                              <Download className="h-3 w-3 mr-1" />
+                            </Button>
+                          </div>
                         </CardFooter>
                       </Card>
                     ))}
@@ -331,6 +371,18 @@ export function DocumentView() {
           )}
         </ScrollArea>
       </div>
-    </div>
+
+      {/* Smart Analysis Dialog */}
+      {
+        selectedDocForScan && (
+          <SmartScanner
+            isOpen={!!selectedDocForScan}
+            onClose={() => setSelectedDocForScan(null)}
+            file={selectedDocForScan.file}
+            title={selectedDocForScan.title}
+          />
+        )
+      }
+    </div >
   );
 }

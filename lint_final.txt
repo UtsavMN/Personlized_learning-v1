@@ -1,0 +1,180 @@
+
+> nextn@0.1.0 lint
+> next lint
+
+
+./src/app/actions/upload-document.ts
+15:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/documents/route.ts
+7:27  Warning: 'request' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/upload/route.ts
+41:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/layout.tsx
+5:10  Warning: 'DevTools' is defined but never used.  @typescript-eslint/no-unused-vars
+28:11  Warning: Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font  @next/next/no-page-custom-font
+
+./src/app/page.tsx
+42:9  Warning: '_user' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/app-sidebar.tsx
+19:5  Warning: 'BookText' is defined but never used.  @typescript-eslint/no-unused-vars
+20:5  Warning: 'Calculator' is defined but never used.  @typescript-eslint/no-unused-vars
+23:5  Warning: 'Code2' is defined but never used.  @typescript-eslint/no-unused-vars
+27:5  Warning: 'Dumbbell' is defined but never used.  @typescript-eslint/no-unused-vars
+28:5  Warning: 'GraduationCap' is defined but never used.  @typescript-eslint/no-unused-vars
+29:5  Warning: 'LogOut' is defined but never used.  @typescript-eslint/no-unused-vars
+31:5  Warning: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars
+33:5  Warning: 'TrendingUp' is defined but never used.  @typescript-eslint/no-unused-vars
+41:10  Warning: 'DropdownMenu' is defined but never used.  @typescript-eslint/no-unused-vars
+41:24  Warning: 'DropdownMenuContent' is defined but never used.  @typescript-eslint/no-unused-vars
+41:45  Warning: 'DropdownMenuItem' is defined but never used.  @typescript-eslint/no-unused-vars
+41:63  Warning: 'DropdownMenuTrigger' is defined but never used.  @typescript-eslint/no-unused-vars
+42:10  Warning: 'FactoryResetWidget' is defined but never used.  @typescript-eslint/no-unused-vars
+51:19  Warning: 'logout' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+52:13  Warning: 'isMobile' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+158:13  Error: 'level' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/components/chat-message.tsx
+21:9  Warning: 'hasBulletPoints' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/header.tsx
+15:10  Warning: 'useState' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/onboarding-wizard.tsx
+29:8  Warning: React Hook useEffect has a missing dependency: 'handleSend'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/smart-scanner.tsx
+3:20  Warning: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+7:45  Warning: 'ImageIcon' is defined but never used.  @typescript-eslint/no-unused-vars
+26:12  Warning: 'numPages' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+36:8  Warning: React Hook useEffect has a missing dependency: 'loadDocument'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+120:18  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+146:18  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/chat-view.tsx
+12:69  Warning: 'CardFooter' is defined but never used.  @typescript-eslint/no-unused-vars
+13:50  Warning: 'FormMessage' is defined but never used.  @typescript-eslint/no-unused-vars
+26:10  Warning: 'Label' is defined but never used.  @typescript-eslint/no-unused-vars
+38:10  Warning: 'initText' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/code-view.tsx
+10:29  Warning: 'CardDescription' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/dashboard-view.tsx
+6:14  Warning: 'LearnerProfile' is defined but never used.  @typescript-eslint/no-unused-vars
+6:30  Warning: 'SubjectMastery' is defined but never used.  @typescript-eslint/no-unused-vars
+8:41  Warning: 'ArrowUpRight' is defined but never used.  @typescript-eslint/no-unused-vars
+167:10  Warning: 'RLSchedulerView' is defined but never used.  @typescript-eslint/no-unused-vars
+335:10  Warning: 'ActionItem' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/document-view.tsx
+3:20  Warning: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+16:27  Warning: 'FileText' is defined but never used.  @typescript-eslint/no-unused-vars
+16:88  Warning: 'MessageSquare' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/flashcards-view.tsx
+5:14  Warning: 'Deck' is defined but never used.  @typescript-eslint/no-unused-vars
+9:16  Warning: 'CardContent' is defined but never used.  @typescript-eslint/no-unused-vars
+15:39  Warning: 'TabsContent' is defined but never used.  @typescript-eslint/no-unused-vars
+16:25  Warning: 'Brain' is defined but never used.  @typescript-eslint/no-unused-vars
+16:32  Warning: 'RotateCcw' is defined but never used.  @typescript-eslint/no-unused-vars
+16:43  Warning: 'Check' is defined but never used.  @typescript-eslint/no-unused-vars
+94:18  Warning: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/grade-predictor-view.tsx
+8:29  Warning: 'AlertTriangle' is defined but never used.  @typescript-eslint/no-unused-vars
+65:18  Warning: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/math-view.tsx
+10:29  Warning: 'CardDescription' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/notes-view.tsx
+9:33  Warning: 'DialogFooter' is defined but never used.  @typescript-eslint/no-unused-vars
+9:47  Warning: 'DialogHeader' is defined but never used.  @typescript-eslint/no-unused-vars
+9:74  Warning: 'DialogTrigger' is defined but never used.  @typescript-eslint/no-unused-vars
+13:24  Warning: 'MoreVertical' is defined but never used.  @typescript-eslint/no-unused-vars
+13:60  Warning: 'PenLine' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/onboarding-view.tsx
+12:82  Warning: 'Clock' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/rl-scheduler-view.tsx
+3:20  Warning: 'useEffect' is defined but never used.  @typescript-eslint/no-unused-vars
+4:10  Warning: 'Card' is defined but never used.  @typescript-eslint/no-unused-vars
+4:16  Warning: 'CardContent' is defined but never used.  @typescript-eslint/no-unused-vars
+4:29  Warning: 'CardHeader' is defined but never used.  @typescript-eslint/no-unused-vars
+4:41  Warning: 'CardTitle' is defined but never used.  @typescript-eslint/no-unused-vars
+4:52  Warning: 'CardDescription' is defined but never used.  @typescript-eslint/no-unused-vars
+4:69  Warning: 'CardFooter' is defined but never used.  @typescript-eslint/no-unused-vars
+6:10  Warning: 'Badge' is defined but never used.  @typescript-eslint/no-unused-vars
+8:10  Warning: 'RLScheduler' is defined but never used.  @typescript-eslint/no-unused-vars
+9:46  Warning: 'Zap' is defined but never used.  @typescript-eslint/no-unused-vars
+9:51  Warning: 'Calendar' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/settings-view.tsx
+6:29  Warning: 'Mail' is defined but never used.  @typescript-eslint/no-unused-vars
+19:13  Warning: 'user' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/smart-agent-view.tsx
+4:39  Warning: 'TabsContent' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/studio-view.tsx
+4:39  Warning: 'TabsContent' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/timetable-view.tsx
+15:79  Warning: 'DialogTrigger' is defined but never used.  @typescript-eslint/no-unused-vars
+68:14  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/views/tracker-view.tsx
+16:10  Warning: 'CheckCircle2' is defined but never used.  @typescript-eslint/no-unused-vars
+16:24  Warning: 'Circle' is defined but never used.  @typescript-eslint/no-unused-vars
+23:12  Warning: 'activeTab' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/widgets/ai-reasoning-panel.tsx
+3:41  Warning: 'CardTitle' is defined but never used.  @typescript-eslint/no-unused-vars
+3:52  Warning: 'CardDescription' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/widgets/ai-tutor-floating.tsx
+6:15  Warning: 'MessageCircle' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/hooks/use-toast.ts
+21:7  Warning: 'actionTypes' is assigned a value but only used as a type.  @typescript-eslint/no-unused-vars
+
+./src/lib/adaptation/engine.ts
+18:84  Warning: 'questionsCount' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/ai/embedding-engine.ts
+1:20  Warning: 'env' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/ai/grade-predictor.ts
+184:13  Error: 'percentage' is never reassigned. Use 'const' instead.  prefer-const
+198:18  Warning: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/ai/huggingface-engine.ts
+83:32  Warning: 'imageBlob' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/ai/tracker-intelligence.ts
+2:10  Warning: 'differenceInDays' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/ai/vector-store.ts
+1:14  Warning: 'VectorEntry' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/auth-context.tsx
+94:8  Warning: React Hook useEffect has a missing dependency: 'USE_DEV_AUTH'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/lib/document-engine/ingest.ts
+3:47  Warning: 'DocumentChunk' is defined but never used.  @typescript-eslint/no-unused-vars
+10:11  Warning: 'ProcessedSection' is defined but never used.  @typescript-eslint/no-unused-vars
+73:27  Warning: 'imgName' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/document-storage.ts
+29:63  Warning: 'filename' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/planning/scheduler.ts
+2:10  Warning: 'SubjectMastery' is defined but never used.  @typescript-eslint/no-unused-vars
+2:26  Warning: 'TimetableEntry' is defined but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

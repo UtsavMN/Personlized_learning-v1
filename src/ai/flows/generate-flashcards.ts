@@ -37,7 +37,7 @@ export const generateFlashcardsFlow = ai.defineFlow(
 
         try {
             // Mock / Dev Mode Bypass
-            const shouldUseMock = process.env.NODE_ENV === 'development' || !process.env.GOOGLE_GENAI_API_KEY;
+            const shouldUseMock = !process.env.GOOGLE_GENAI_API_KEY;
 
             if (shouldUseMock) {
                 console.log("Using Mock AI for Flashcards (Dev/NoKey)");
@@ -54,7 +54,7 @@ export const generateFlashcardsFlow = ai.defineFlow(
             }
 
             const { output } = await ai.generate({
-                model: 'googleai/gemini-1.5-flash',
+                model: 'googleai/gemini-1.5-flash-latest',
                 prompt: prompt,
                 output: { schema: GenerateFlashcardsOutput },
             });

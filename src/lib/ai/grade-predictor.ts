@@ -27,7 +27,7 @@ export class GradePredictor {
         // Output Layer: 1 value (Predicted Percentage 0-100)
         this.model.add(tf.layers.dense({
             units: 1,
-            activation: 'linear' // or 'sigmoid' if we normalize output to 0-1
+            activation: 'sigmoid' // Normalized output 0-1
         }));
 
         this.model.compile({
@@ -175,12 +175,14 @@ export class GradePredictor {
     predict(input: InputVector): number {
         const xs = tf.tensor2d([input]);
         const output = this.model.predict(xs) as tf.Tensor;
-        const result = output.dataSync()[0];
+        const rawValue = output.dataSync()[0]; // 0-1 range due to sigmoid
 
         xs.dispose();
         output.dispose();
 
-        return result;
+        // Convert 0-1 to 0-100 and clamp
+        const percentage = rawValue * 100;
+        return Math.max(0, Math.min(100, percentage));
     }
 
     async save() {

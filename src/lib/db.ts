@@ -20,6 +20,10 @@ export interface DocumentEntry {
     createdAt: Date;
     size: number;
     type: string;
+    // Enhanced Metadata
+    processed?: boolean;
+    pageCount?: number;
+    hierarchy?: any; // Cached JSON tree of structure
 }
 
 export interface ChatMessageEntry {
@@ -161,10 +165,18 @@ export class AppDatabase extends Dexie {
     // New Non-LLM Core Tables
     analytics!: EntityTable<AnalyticsEvent, 'id'>;
     flashcardDecks!: EntityTable<Deck, 'id'>;
-    flashcards!: EntityTable<Flashcard, 'id'>;
-    flashcards!: EntityTable<Flashcard, 'id'>;
+
     embeddings!: EntityTable<VectorEntry, 'id'>;
     notes!: EntityTable<NoteEntry, 'id'>;
+
+    // Document Intelligence
+    sections!: EntityTable<DocumentSection, 'id'>;
+    figures!: EntityTable<DocumentFigure, 'id'>;
+    chunks!: EntityTable<DocumentChunk, 'id'>;
+    focusSessions!: EntityTable<FocusSession, 'id'>;
+
+    // Timetable Meta
+    timetableMeta!: EntityTable<TimetableMeta, 'id'>;
 
     constructor() {
         super('MentoraDB');
@@ -199,8 +211,80 @@ export class AppDatabase extends Dexie {
         this.version(7).stores({
             notes: '++id, title, subject, updatedAt'
         });
+
+        // Version 8: Document Intelligence Engine
+        this.version(8).stores({
+            // Sections: hierarchical structure
+            sections: '++id, documentId, parentId, level',
+            // Figures: extracted images/charts
+            figures: '++id, documentId, type, pageNumber',
+            // Chunks: semantic units for RAG
+            chunks: '++id, documentId, sectionId, *keywords'
+        });
+
+        // Version 9: Focus Sessions & Gamification
+        this.version(9).stores({
+            focusSessions: '++id, startTime, subject'
+        });
+
+        // Version 10: Timetable Image Meta
+        this.version(10).stores({
+            timetableMeta: 'id' // Singleton table, ID always 1?
+        });
     }
 }
+
+export interface TimetableMeta {
+    id: number;
+    imageBlob?: Blob;
+    imageBase64?: string; // Fallback for robust storage
+    uploadedAt: Date;
+}
+
+
+export interface FocusSession {
+    id?: number;
+    startTime: Date;
+    durationMinutes: number;
+    subject: string;
+    completed: boolean;
+    xpEarned: number;
+}
+
+// --- Document Intelligence Interfaces ---
+
+export interface DocumentSection {
+    id?: number;
+    documentId: number;
+    title: string;
+    level: number; // 1=H1, 2=H2...
+    parentId: number | null;
+    content: string; // The text content of this section specifically
+    pageStart: number;
+    pageEnd: number;
+    order: number; // To maintain reading order
+}
+
+export interface DocumentFigure {
+    id?: number;
+    documentId: number;
+    blob: Blob;
+    caption: string;
+    pageNumber: number;
+    type: 'figure' | 'image' | 'table';
+    context?: string; // Surrounding text/context
+}
+
+export interface DocumentChunk {
+    id?: number;
+    documentId: number;
+    sectionId: number | null;
+    content: string;
+    keywords: string[];
+    embedding?: number[]; // Optional direct vector here, or link to vectors table
+    metadata?: any;
+}
+
 
 export interface NoteEntry {
     id?: number;

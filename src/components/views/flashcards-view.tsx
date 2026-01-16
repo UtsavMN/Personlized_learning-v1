@@ -4,16 +4,19 @@ import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Deck, Flashcard } from '@/lib/db';
 import { useToast } from '@/hooks/use-toast';
+import { useDelete } from '@/hooks/use-delete';
 import { calculateNextReview, INITIAL_CARD_STATE } from '@/lib/srs-algorithm';
 import { Button } from '@/components/ui/button';
+import { generateFlashcardsLocal } from '@/lib/ai/local-flows';
+import { webLLM } from '@/lib/ai/llm-engine';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Loader2, Plus, Brain, RotateCcw, Check, Sparkles, X, Layers, Play, StickyNote, Zap } from 'lucide-react';
+import { Loader2, Plus, Brain, RotateCcw, Check, Sparkles, X, Layers, Play, StickyNote, Zap, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NotesView } from './notes-view';
 
@@ -31,6 +34,10 @@ export function FlashcardsView() {
     const documents = useLiveQuery(() => db.documents.toArray());
     const masterySubjects = useLiveQuery(() => db.subjectMastery.toArray());
 
+    // Local AI State
+    const [isLoadingModel, setIsLoadingModel] = useState(false);
+    const [modelProgress, setModelProgress] = useState('');
+
     const handleCreateDeck = async () => {
         if (!newDeckName) return;
         setIsCreating(true);
@@ -43,40 +50,85 @@ export function FlashcardsView() {
             });
 
             if (selectedDocId) {
-                const doc = await db.documents.get(parseInt(selectedDocId));
-                if (doc && doc.content) {
-                    toast({ title: "Synthesizing Cards...", description: "AI is analyzing the document context." });
-                    const { generateFlashcardsLocal } = await import('@/lib/ai/local-flows');
-                    const cards = await generateFlashcardsLocal(doc.content, 5);
-                    if (cards && cards.length > 0) {
-                        const cardsToAdd = cards.map(card => ({
-                            deckId,
-                            front: card.front,
-                            back: card.back,
-                            ...INITIAL_CARD_STATE,
-                            nextReview: Date.now()
-                        }));
-                        await db.flashcards.bulkAdd(cardsToAdd as Flashcard[]);
-                        toast({ title: "Success", description: `Generated ${cards.length} cards from ${doc.title}` });
+                const docIdNum = parseInt(selectedDocId);
+                const doc = await db.documents.get(docIdNum);
+
+                if (doc) {
+                    // Initialize Local Brain
+                    setIsLoadingModel(true);
+                    await webLLM.init((report) => {
+                        setModelProgress(report.text);
+                    });
+
+                    toast({ title: "Brain Activated", description: "Analyzing document..." });
+
+                    // Fetch chunks for this document
+                    const chunks = await db.chunks.where('documentId').equals(docIdNum).toArray();
+
+                    let contextContent: string = '';
+
+                    if (chunks && chunks.length > 0) {
+                        // Pick 5 random chunks
+                        const shuffled = chunks.sort(() => 0.5 - Math.random());
+                        contextContent = shuffled.slice(0, 15).map(c => c.content).join('\n\n');
+                    } else {
+                        // Fallback
+                        contextContent = doc.content || doc.description || '';
                     }
-                } else {
-                    await db.flashcards.add({
-                        deckId,
-                        front: "Edit this card",
-                        back: "Add the answer here",
-                        ...INITIAL_CARD_STATE,
-                        nextReview: Date.now()
-                    } as Flashcard);
-                    toast({ title: "Deck Created", description: "Created empty deck." });
+
+                    if (contextContent.length > 0) {
+                        const flashcards = await generateFlashcardsLocal(contextContent, 5);
+
+                        if (flashcards.length > 0) {
+                            const cardsToAdd = flashcards.map((card) => ({
+                                deckId,
+                                front: card.front,
+                                back: card.back,
+                                ...INITIAL_CARD_STATE,
+                                nextReview: Date.now()
+                            }));
+                            await db.flashcards.bulkAdd(cardsToAdd as Flashcard[]);
+                            toast({ title: "Success", description: `Generated ${flashcards.length} cards locally` });
+                        }
+                    } else {
+                        toast({ title: "Generation Skipped", description: "No content found." });
+                    }
                 }
                 setNewDeckName('');
                 setSelectedDocId('');
+            } else {
+                // Empty content handling
+                await db.flashcards.add({
+                    deckId,
+                    front: "Edit this card",
+                    back: "Add the answer here",
+                    ...INITIAL_CARD_STATE,
+                    nextReview: Date.now()
+                } as Flashcard);
+                toast({ title: "Deck Created", description: "Created empty deck (no content found)." });
             }
+
+            setNewDeckName('');
+            setSelectedDocId('');
         } catch (e: any) {
-            toast({ variant: "destructive", title: "Error", description: "Failed to create deck" });
+            toast({ variant: "destructive", title: "Error", description: "Failed to create deck: " + e.message });
         } finally {
             setIsCreating(false);
+            setIsLoadingModel(false);
+            setModelProgress('');
         }
+    };
+
+    const { deleteItem } = useDelete();
+
+    const handleDeleteDeck = (id: number) => {
+        if (!id) return;
+        deleteItem(async () => {
+            await db.transaction('rw', db.flashcardDecks, db.flashcards, async () => {
+                await db.flashcardDecks.delete(id);
+                await db.flashcards.where('deckId').equals(id).delete();
+            });
+        }, { successMessage: 'Deck Deleted' });
     };
 
     if (selectedDeck !== null) {
@@ -84,7 +136,7 @@ export function FlashcardsView() {
     }
 
     return (
-        <div className="h-full p-2 md:p-6 space-y-6 animate-in fade-in duration-500 flex flex-col">
+        <div className="h-full p-2 md:p-6 space-y-6 flex flex-col">
 
             {/* Header / Tabs */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 p-8 rounded-3xl bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-white/20 dark:border-white/5 backdrop-blur-xl shadow-xl shrink-0">
@@ -113,6 +165,9 @@ export function FlashcardsView() {
                                 <DialogContent className="sm:max-w-md">
                                     <DialogHeader>
                                         <DialogTitle>New Knowledge Deck</DialogTitle>
+                                        <DialogDescription>
+                                            Create a new flashcard deck to start studying.
+                                        </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4 py-4">
                                         <div className="space-y-2">
@@ -137,8 +192,18 @@ export function FlashcardsView() {
                                                 {documents?.map(doc => <option key={doc.id} value={doc.id}>{doc.title}</option>)}
                                             </select>
                                         </div>
-                                        <Button onClick={handleCreateDeck} disabled={!newDeckName || isCreating} className="w-full h-10">
-                                            {isCreating ? <Loader2 className="animate-spin" /> : "Create Deck"}
+                                        <Button onClick={handleCreateDeck} disabled={!newDeckName || isCreating} className="w-full h-auto py-3 flex flex-col gap-1">
+                                            {isCreating ? (
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <Loader2 className="animate-spin w-4 h-4" />
+                                                        <span>{isLoadingModel ? "Initializing Brain..." : "Generating..."}</span>
+                                                    </div>
+                                                    {modelProgress && (
+                                                        <span className="text-[10px] opacity-70 truncate max-w-[200px]">{modelProgress}</span>
+                                                    )}
+                                                </>
+                                            ) : "Create Deck"}
                                         </Button>
                                     </div>
                                 </DialogContent>
@@ -173,7 +238,20 @@ export function FlashcardsView() {
                                     <CardHeader>
                                         <div className="flex justify-between items-start mb-2">
                                             <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">{deck.subject}</Badge>
-                                            <Layers className="w-5 h-5 text-muted-foreground/50" />
+                                            <div className="flex items-center gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-muted-foreground hover:text-destructive z-10"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteDeck(deck.id!);
+                                                    }}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                                <Layers className="w-5 h-5 text-muted-foreground/50" />
+                                            </div>
                                         </div>
                                         <CardTitle className="text-xl font-bold leading-tight">{deck.title}</CardTitle>
                                         <CardDescription className="line-clamp-2">

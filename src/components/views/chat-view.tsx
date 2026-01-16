@@ -89,7 +89,19 @@ export function ChatView({ isFloating = false }: { isFloating?: boolean }) {
     });
 
     const doc = documents?.find(d => d.id === Number(values.documentId));
-    const context = doc?.content ? doc.content.slice(0, 15000) : ""; // Truncated context
+    // const context = doc?.content ? doc.content.slice(0, 15000) : ""; // OLD
+
+    let context = "";
+    if (doc) {
+      if (doc.processed && doc.id) {
+        const { DocumentApi } = await import('@/lib/document-engine/api');
+        context = await DocumentApi.getFullText(doc.id);
+      } else {
+        context = doc.content || "";
+      }
+    }
+    // Truncate for V1 Context Limit
+    context = context.slice(0, 15000);
 
     try {
       let fullResponse = "";

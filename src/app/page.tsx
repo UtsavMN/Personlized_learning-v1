@@ -15,6 +15,7 @@ import { OnboardingView } from "@/components/views/onboarding-view";
 import { SettingsView } from "@/components/views/settings-view";
 import { SmartAgentView } from "@/components/views/smart-agent-view";
 import { StudioView } from "@/components/views/studio-view";
+import { GradePredictorView } from '@/components/views/grade-predictor-view';
 import { useLocalAuth } from '@/lib/auth-context';
 import { useSearchParams } from 'next/navigation';
 import { AITutorFloating } from '@/components/widgets/ai-tutor-floating';
@@ -35,10 +36,10 @@ function DashboardContent() {
     if (view && view !== activeTab) {
       setActiveTab(view);
     }
-  }, [searchParams]);
+  }, [searchParams, activeTab]);
 
   // Determine effective user (Clerk or Local/Dev)
-  const user = localUser || clerkUser;
+  const _user = localUser || clerkUser;
 
   // Wait for auth to initialize
   if (isUserLoading) {
@@ -61,19 +62,23 @@ function DashboardContent() {
   // if (!user) return <AuthView />;
 
   const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard': return <DashboardView />;
-      case 'timetable': return <TimetableView />;
-      case 'tracker': return <TrackerView />;
-      case 'documents': return <DocumentView />;
-      case 'studio': return <StudioView />;
-      case 'quiz': return <QuizView />;
-      case 'flashcards': return <FlashcardsView />;
-      case 'predictor': return <GradePredictorView />;
-      case 'smart-agent': return <SmartAgentView />;
-      case 'settings': return <SettingsView />;
-      default: return <DashboardView />;
-    }
+    return (
+      <>
+        {/* Core Views: Keep-Alive for instant switching */}
+        <div className={activeTab === 'dashboard' ? 'block' : 'hidden'}><DashboardView /></div>
+        <div className={activeTab === 'timetable' ? 'block' : 'hidden'}><TimetableView /></div>
+        <div className={activeTab === 'tracker' ? 'block' : 'hidden'}><TrackerView /></div>
+        <div className={activeTab === 'flashcards' ? 'block' : 'hidden'}><FlashcardsView /></div>
+
+        {/* Secondary Views: Render on demand */}
+        {activeTab === 'documents' && <DocumentView />}
+        {activeTab === 'studio' && <StudioView />}
+        {activeTab === 'quiz' && <QuizView />}
+        {activeTab === 'predictor' && <GradePredictorView />}
+        {activeTab === 'smart-agent' && <SmartAgentView />}
+        {activeTab === 'settings' && <SettingsView />}
+      </>
+    );
   }
 
   const getPageTitle = (tab: string) => {

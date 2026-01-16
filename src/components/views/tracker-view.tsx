@@ -17,6 +17,8 @@ import { CheckCircle2, Circle, Flame, Target, Plus, TrendingUp, Sparkles, Trophy
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { StatsCard } from '@/components/dashboard-widgets';
+import { useDelete } from '@/hooks/use-delete';
 
 export function TrackerView() {
     const [date, setDate] = useState<Date | undefined>(new Date());
@@ -96,12 +98,14 @@ export function TrackerView() {
         await db.hobbies.update(hobby.id, { completedDates: updatedDates });
     };
 
-    const deleteHobby = async (id?: number) => {
-        if (id) await db.hobbies.delete(id);
+    const { deleteItem } = useDelete();
+
+    const deleteHobby = (id?: number) => {
+        if (id) deleteItem(async () => await db.hobbies.delete(id), { successMessage: "Habit deleted" });
     }
 
-    const deleteTask = async (id?: number) => {
-        if (id) await db.tasks.delete(id);
+    const deleteTask = (id?: number) => {
+        if (id) deleteItem(async () => await db.tasks.delete(id), { successMessage: "Task deleted" });
     }
 
 
@@ -179,8 +183,9 @@ export function TrackerView() {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
+                                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                                                 onClick={() => deleteTask(task.id)}
+                                                title="Delete Task"
                                             >
                                                 <span className="sr-only">Delete</span>
                                                 <Plus className="w-4 h-4 rotate-45" />
@@ -251,8 +256,12 @@ export function TrackerView() {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="absolute bottom-2 right-2 opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity"
-                                                    onClick={() => deleteHobby(hobby.id)}
+                                                    className="absolute bottom-2 right-2 text-muted-foreground hover:text-destructive transition-colors"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteHobby(hobby.id);
+                                                    }}
+                                                    title="Delete Habit"
                                                 >
                                                     <Plus className="w-4 h-4 rotate-45" />
                                                 </Button>
@@ -306,20 +315,20 @@ export function TrackerView() {
 
                 {/* Mini Stats */}
                 <div className="grid grid-cols-2 gap-4">
-                    <Card>
-                        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                            <Trophy className="w-6 h-6 text-yellow-500 mb-2" />
-                            <span className="text-2xl font-bold">{hobbies.filter(h => h.completedDates.some(d => isSameDay(new Date(d), new Date()))).length}</span>
-                            <span className="text-xs text-muted-foreground">Habits Today</span>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                            <Target className="w-6 h-6 text-blue-500 mb-2" />
-                            <span className="text-2xl font-bold">{completedTasks.length}</span>
-                            <span className="text-xs text-muted-foreground">Tasks Done</span>
-                        </CardContent>
-                    </Card>
+                    <StatsCard
+                        title="Habits Today"
+                        value={hobbies.filter(h => h.completedDates.some(d => isSameDay(new Date(d), new Date()))).length}
+                        icon={Trophy}
+                        color="text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30"
+                        trend="Active"
+                    />
+                    <StatsCard
+                        title="Tasks Done"
+                        value={completedTasks.length}
+                        icon={Target}
+                        color="text-blue-500 bg-blue-100 dark:bg-blue-900/30"
+                        trend="Completed"
+                    />
                 </div>
 
             </div>

@@ -4,11 +4,18 @@ const fs = require('fs');
 // Read .env manually since we don't assume dotenv is installed globally
 let apiKey = '';
 try {
-    const envFile = fs.readFileSync('.env', 'utf8');
-    const match = envFile.match(/GOOGLE_GENAI_API_KEY=(.*)/);
+    let envContent = '';
+    if (fs.existsSync('.env.local')) {
+        envContent += fs.readFileSync('.env.local', 'utf8') + '\n';
+    }
+    if (fs.existsSync('.env')) {
+        envContent += fs.readFileSync('.env', 'utf8') + '\n';
+    }
+
+    const match = envContent.match(/GOOGLE_GENAI_API_KEY=(.*)/);
     if (match) apiKey = match[1].trim();
 } catch (e) {
-    console.error("Could not read .env");
+    console.error("Could not read .env files", e);
     process.exit(1);
 }
 

@@ -1,24 +1,23 @@
-'use client';
-
-import { useState } from 'react';
+import { generateTimetableLocal } from '@/lib/ai/local-flows';
+import { useState, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Upload, Calendar, List, Trash2 } from 'lucide-react';
-import { parseTimetableAction } from '@/ai/flows/parse-timetable';
+import { Loader2, Upload, Calendar, List, Trash2, Plus, Maximize2, X, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useDelete } from '@/hooks/use-delete';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Plus } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Progress } from '@/components/ui/progress';
 
 const manualEntrySchema = z.object({
   day: z.string().min(1, "Day is required"),
@@ -30,263 +29,150 @@ const manualEntrySchema = z.object({
 });
 
 export function TimetableView() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  /* 
+     NOTE: Disabling AI OCR for now as per user request (Pivot to Manual + Image Reference)
+     We will keep the 'isUploading' state for the image save process, just removal of Tesseract + LLM calls.
+  */
   const [isUploading, setIsUploading] = useState(false);
+  // const [progressValue, setProgressValue] = useState(0);
+  // const [statusMessage, setStatusMessage] = useState("");
   const { toast } = useToast();
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
 
-  // Live query for timetable entries
   const schedule = useLiveQuery(() => db.timetable.toArray());
+  const timetableMeta = useLiveQuery(() => db.timetableMeta.get(1));
 
-  // Checking if we have any data to determine default view
-  const hasData = schedule && schedule.length > 0;
+  // Sync imageSrc with DB data (Base64)
+  useEffect(() => {
+    if (timetableMeta?.imageBase64) {
+      setImageSrc(timetableMeta.imageBase64);
+    } else if (timetableMeta?.imageBlob && timetableMeta.imageBlob instanceof Blob) {
+      // Legacy fallback
+      const url = URL.createObjectURL(timetableMeta.imageBlob);
+      setImageSrc(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setImageSrc(null);
+    }
+  }, [timetableMeta]);
   const [isAddOpen, setIsAddOpen] = useState(false);
-
   const form = useForm<z.infer<typeof manualEntrySchema>>({
     resolver: zodResolver(manualEntrySchema),
     defaultValues: {
-      day: 'Monday',
-      startTime: '',
-      endTime: '',
-      subject: '',
-      room: '',
       type: 'Lecture',
-    },
+    }
   });
 
-  const onManualSubmit = async (data: z.infer<typeof manualEntrySchema>) => {
-    try {
-      await db.timetable.add({
-        day: data.day,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        subject: data.subject,
-        room: data.room || '',
-        type: data.type,
-      });
-      toast({ title: "Class Added!" });
-      form.reset();
-      setIsAddOpen(false);
-    } catch (error) {
-      toast({ title: "Error adding class", variant: "destructive" });
-    }
+  const onManualSubmit = async (values: z.infer<typeof manualEntrySchema>) => {
+    await db.timetable.add(values);
+    setIsAddOpen(false);
+    toast({ title: "Class added successfully" });
+    form.reset();
   };
 
+  // Helper to extract progress percentage from WebLLM messages
+  const extractProgress = (msg: string) => {
+    // WebLLM messages often look like "Fetch param cache [15/30MB]" or similar
+    // Heuristic: If "Initializing", set 10%. If "Fetch", calculate range 20-80%.
+    if (msg.includes("Initializing")) return 10;
+    if (msg.includes("Fetching param cache")) return 30; // Static estimate if regex fails
+    if (msg.includes("Loading model")) return 60;
+    if (msg.includes("Parsing schedule")) return 90;
+    return 0;
+  };
+
+  /* 
+     LOCAL AI IMPLEMENTATION: TIMETABLE OCR 
+     Using Tesseract.js to process images entirely in the browser.
+  */
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
+    // setProgressValue(0);
+    // setStatusMessage("Saving image...");
+
     try {
-      // 1. Convert to Base64
+      // Convert to Base64 for robust storage
       const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const base64 = reader.result as string;
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
 
-        // 2. Send to AI
-        const result = await parseTimetableAction({ timetableImageUri: base64 });
-
-        // 3. Save to Dexie
-        await db.timetable.clear(); // Clear old schedule first? Or append? User said "first remove content", so clear.
-        await db.timetable.bulkAdd(result.entries.map(entry => ({
-          ...entry,
-          // Ensure types match interface if AI returns slightly different strings, but Zod content should be close
-        })));
+        await db.timetableMeta.put({
+          id: 1,
+          imageBase64: base64String, // Store string directly
+          uploadedAt: new Date()
+        });
 
         toast({
-          title: "Timetable Parsed!",
-          description: `Successfully added ${result.entries.length} classes.`,
+          title: "Schedule Image Saved",
+          description: "Your timetable reference has been updated.",
         });
+        setIsUploading(false);
       };
-    } catch (error) {
+      reader.readAsDataURL(file);
+
+    } catch (error: any) {
       console.error(error);
-      toast({
-        title: "Error parsing timetable",
-        description: "Could not extract data from the image. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
+      toast({ title: "Error saving image", variant: "destructive" });
       setIsUploading(false);
     }
   };
 
   const handleClear = async () => {
-    if (confirm("Are you sure you want to clear your timetable?")) {
+    if (confirm("Are you sure you want to clear your timetable and remove the image?")) {
       await db.timetable.clear();
+      await db.timetableMeta.delete(1);
       toast({ title: "Timetable cleared" });
     }
+  };
+
+  const { deleteItem } = useDelete();
+
+  const handleDeleteClass = (id?: number) => {
+    if (!id) return;
+    deleteItem(
+      async () => await db.timetable.delete(id),
+      { successMessage: "Class removed" }
+    );
   };
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const currentDay = format(new Date(), 'EEEE');
 
-  if (!hasData && !isUploading) {
-    return (
-      <>
-        <Card className="max-w-md mx-auto mt-10">
-          <CardHeader>
-            <CardTitle>Timetable</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-6">
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-10 flex flex-col items-center justify-center w-full hover:bg-muted/50 transition-colors">
-              <Upload className="h-10 w-10 text-muted-foreground mb-4" />
-              <Label htmlFor="timetable-upload" className="cursor-pointer text-center">
-                <span className="font-semibold text-primary">Click to upload</span> an image
-                <Input
-                  id="timetable-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-              </Label>
-              <p className="text-xs text-muted-foreground mt-2">JPG, PNG supported</p>
-            </div>
-
-            <div className="flex items-center w-full gap-4">
-              <div className="h-px bg-border flex-1" />
-              <span className="text-xs text-muted-foreground font-medium uppercase">Or</span>
-              <div className="h-px bg-border flex-1" />
-            </div>
-
-            <Button variant="outline" className="w-full" onClick={() => setIsAddOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Add Class Manually
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Class Manually</DialogTitle>
-              <DialogDescription>Enter the details of your class.</DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onManualSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="day"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Day</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a day" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {daysOfWeek && daysOfWeek.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="startTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Time</FormLabel>
-                        <FormControl>
-                          <Input type="time" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="endTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>End Time</FormLabel>
-                        <FormControl>
-                          <Input type="time" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="subject"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Subject</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Mathematics" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="room"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Room (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. 101" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Lecture">Lecture</SelectItem>
-                            <SelectItem value="Lab">Lab</SelectItem>
-                            <SelectItem value="Tutorial">Tutorial</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button type="submit">Save Class</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  }
+  // ... (render logic)
 
   if (isUploading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[50vh]">
-        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-        <h3 className="text-xl font-semibold">Analyzing Timetable...</h3>
-        <p className="text-muted-foreground">This may take a few moments.</p>
+      <div className="flex flex-col items-center justify-center h-[50vh] gap-4 px-10">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <div className="text-center space-y-2 w-full max-w-md">
+          <h3 className="text-xl font-semibold">Saving Image...</h3>
+          <p className="text-muted-foreground text-sm">Please wait while we update your reference.</p>
+        </div>
       </div>
     );
   }
+  // ...
 
   return (
     <div className="space-y-6 h-full flex flex-col">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold tracking-tight">My Timetable</h2>
         <div className="flex gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-4 w-4 mr-2" /> Upload Image
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setIsAddOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Add Class
           </Button>
@@ -295,6 +181,71 @@ export function TimetableView() {
           </Button>
         </div>
       </div>
+
+
+
+      {
+        (timetableMeta?.imageBase64 || timetableMeta?.imageBlob) ? (
+          <div className="relative">
+            <Card className="overflow-hidden bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/20 dark:to-purple-950/20 border-primary/10">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-primary" />
+                  <CardTitle className="text-sm font-medium">Reference Schedule</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="relative">
+                  {imageSrc && (
+                    <img
+                      src={imageSrc}
+                      alt="Timetable Reference"
+                      className="w-full max-h-[500px] object-contain rounded-md border bg-white/50 dark:bg-black/50 backdrop-blur"
+                    />
+                  )}
+                </div>
+              </CardContent>
+              <CardFooter className="pt-2 flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setIsFullScreen(true)} className="gap-2">
+                  <Maximize2 className="w-4 h-4" /> View Full Image
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* Full Screen Modal Overlay */}
+            {isFullScreen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setIsFullScreen(false)}>
+                <div className="relative max-w-5xl max-h-screen w-full flex flex-col items-center">
+                  <div className="absolute -top-14 right-0 flex gap-2">
+                    <Button
+                      variant="secondary"
+                      className="rounded-full bg-white/10 hover:bg-white/20 text-white gap-2"
+                      onClick={() => setIsFullScreen(false)}
+                    >
+                      <X className="w-4 h-4" /> Close
+                    </Button>
+                  </div>
+
+                  {imageSrc && (
+                    <img
+                      src={imageSrc}
+                      alt="Full Timetable"
+                      className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain bg-black"
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-muted-foreground bg-muted/5 gap-2 hover:bg-muted/10 transition-colors cursor-pointer"
+            onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-8 h-8 opacity-50" />
+            <p className="font-medium">Upload Manual Schedule Image</p>
+            <p className="text-xs">Keeps your reference handy while you study</p>
+          </div>
+        )
+      }
 
       <Tabs defaultValue="daily" className="w-full flex-1 flex flex-col">
         <div className="flex justify-center mb-6">
@@ -331,6 +282,17 @@ export function TimetableView() {
                             <p className="text-sm text-muted-foreground">{cls.type} • {cls.room}</p>
                           </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClass(cls.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
                 </div>
@@ -353,10 +315,23 @@ export function TimetableView() {
                   <CardContent className="p-3 flex-1">
                     <ul className="space-y-3">
                       {classes.map((cls, j) => (
-                        <li key={j} className="text-sm border-b last:border-0 pb-2 last:pb-0">
-                          <div className="font-medium text-primary">{cls.startTime} - {cls.endTime}</div>
-                          <div className="font-semibold">{cls.subject}</div>
-                          <div className="text-xs text-muted-foreground">{cls.room}</div>
+                        <li key={j} className="text-sm border-b last:border-0 pb-2 last:pb-0 flex justify-between items-start group">
+                          <div>
+                            <div className="font-medium text-primary">{cls.startTime} - {cls.endTime}</div>
+                            <div className="font-semibold">{cls.subject}</div>
+                            <div className="text-xs text-muted-foreground">{cls.room}</div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClass(cls.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </li>
                       ))}
                     </ul>
@@ -482,6 +457,6 @@ export function TimetableView() {
           </Form>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }
