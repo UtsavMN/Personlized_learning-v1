@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import {
+  uploadDocumentAction,
+  getDocumentsAction,
+  deleteDocumentAction,
+  indexDocumentAction
+} from '@/app/actions/documents';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -15,9 +19,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, FileUp, FileText, Trash2, Download, CloudUpload, FileType, Sparkles, MessageSquare, Scan } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
-import { summarizeDocumentAction } from '@/app/actions/ai';
 import { useDelete } from '@/hooks/use-delete';
 import dynamic from 'next/dynamic';
+import { SummaryDialog } from '@/components/summary-dialog';
 
 const SmartScanner = dynamic(() => import('../smart-scanner').then(mod => mod.SmartScanner), {
   ssr: false,
@@ -48,10 +52,22 @@ export function DocumentView() {
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [selectedDocForScan, setSelectedDocForScan] = useState<any | null>(null);
+  const [selectedDocForSummary, setSelectedDocForSummary] = useState<{ id: number; title: string } | null>(null);
 
-  // Live query from Dexie
-  const documents = useLiveQuery(() => db.documents.toArray());
-  const documentsLoading = !documents;
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(true);
+
+  const refreshLibrary = async () => {
+    const res = await getDocumentsAction();
+    if (res.success) {
+      setDocuments(res.documents);
+    }
+    setDocumentsLoading(false);
+  };
+
+  useEffect(() => {
+    refreshLibrary();
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,43 +87,36 @@ export function DocumentView() {
       const file = data.documentFile[0];
 
       toast({
-        title: "Processing Document...",
-        description: "Analyzing structure, images, and content."
+        title: "Uploading Materials...",
+        description: "Moving file to secure local storage."
       });
 
-      // Import the new engine dynamically
-      const { ingestDocument } = await import('@/lib/ai/rag-pipeline');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('subject', data.subject);
+      formData.append('description', data.description || '');
 
-      // Perform Ingestion
-      const result = await ingestDocument(file, Date.now()); // Using Date.now() as temp ID before saving doc? 
-      // Actually we should save doc first to get ID, or update ID strategy. 
-      // Local Dexie uses auto-increment.
+      const result = await uploadDocumentAction(formData);
 
-      // Let's safe doc first to get ID
-      const docId = await db.documents.add({
-        title: data.title || file.name.replace('.pdf', ''),
-        subject: data.subject,
-        description: data.description || '',
-        content: '', // Will be filled? Or we stick to chunks?
-        file: file,
-        createdAt: new Date(),
-        size: file.size,
-        type: file.type,
-        processed: true // Mark as processed by RAG
-      });
+      if (result.success && result.document) {
+        toast({
+          title: "Document Saved",
+          description: "Starting AI indexing in background...",
+        });
 
-      // Now Ingest with real ID
-      await ingestDocument(file, docId);
+        // Trigger Indexing
+        indexDocumentAction(result.document.id).then((idxRes) => {
+          if (idxRes.success) {
+            toast({ title: "Indexing Complete", description: "Document optimized for AI search." });
+            refreshLibrary();
+          }
+        });
 
-      // Metadata already saved above
-
-      toast({
-        title: 'Document Intelligence Ready',
-        description: 'Deep analysis complete. Structure and figures extracted.',
-      });
-
-      form.reset();
-
+        await refreshLibrary();
+        form.reset();
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error: any) {
       console.error('Error uploading document:', error);
       toast({
@@ -123,21 +132,26 @@ export function DocumentView() {
   const { deleteItem } = useDelete();
 
   const handleDelete = (id: number) => {
-    deleteItem(async () => await db.documents.delete(id), {
+    deleteItem(async () => {
+      const result = await deleteDocumentAction(id);
+      if (result.success) {
+        await refreshLibrary();
+      } else {
+        throw new Error(result.error);
+      }
+    }, {
       successMessage: 'Document deleted',
       confirmMessage: 'Are you sure you want to delete this document?'
     });
   };
 
   const handleDownload = (doc: any) => {
-    if (doc.file) {
-      const url = URL.createObjectURL(doc.file);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = doc.title + '.pdf';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    // Note: Since files are on local disk, we'd need an API to serve them
+    // For now, we'll notify that they are stored in data/uploads
+    toast({
+      title: "Local File Access",
+      description: `Stored at: ${doc.filePath}`,
+    });
   };
 
   // Drag and Drop handlers
@@ -317,27 +331,16 @@ export function DocumentView() {
                           </span>
                           <div className="flex gap-1">
                             <Button variant="ghost" size="sm" className="h-6 text-xs px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                              onClick={async () => {
-                                toast({ title: "Summarizing...", description: "Asking AI to summarize this document." });
-                                if (doc.content) {
-                                  const res = await summarizeDocumentAction(doc.content.substring(0, 1500)); // Limit for speed and to respect API limits
-                                  if (res.success && res.summary) {
-                                    alert(res.summary); // Simple alert for now, TODO: Modal
-                                    // Update description
-                                    if (doc.id) {
-                                      await db.documents.update(doc.id, { description: res.summary });
-                                      toast({ title: "Updated", description: "Document description updated with AI summary." });
-                                    }
-                                  } else {
-                                    toast({ variant: "destructive", title: "Error", description: res.error });
-                                  }
+                              onClick={() => {
+                                if (doc.id) {
+                                  setSelectedDocForSummary({ id: doc.id, title: doc.title });
                                 } else {
-                                  toast({ variant: "destructive", title: "No Content", description: "Document content is empty." });
+                                  toast({ variant: "destructive", title: "Error", description: "Document ID not found." });
                                 }
                               }}
                             >
                               <Sparkles className="h-3 w-3 mr-1" />
-                              Summarize
+                              View Summary
                             </Button>
                             <Button variant="ghost" size="sm" className="h-6 text-xs px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
                               onClick={() => {
@@ -383,6 +386,16 @@ export function DocumentView() {
           />
         )
       }
+
+      {/* Summary Dialog */}
+      {selectedDocForSummary && (
+        <SummaryDialog
+          isOpen={!!selectedDocForSummary}
+          onClose={() => setSelectedDocForSummary(null)}
+          docId={selectedDocForSummary.id}
+          docTitle={selectedDocForSummary.title}
+        />
+      )}
     </div >
   );
 }

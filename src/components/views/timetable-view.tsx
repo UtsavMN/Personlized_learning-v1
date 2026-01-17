@@ -1,7 +1,12 @@
-import { generateTimetableLocal } from '@/lib/ai/local-flows';
+import {
+  getTimetableAction,
+  addTimetableItemAction,
+  deleteTimetableItemAction,
+  getTimetableMetaAction,
+  updateTimetableMetaAction,
+  clearTimetableAction
+} from "@/app/actions/study";
 import { useState, useRef, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,22 +46,33 @@ export function TimetableView() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
 
-  const schedule = useLiveQuery(() => db.timetable.toArray());
-  const timetableMeta = useLiveQuery(() => db.timetableMeta.get(1));
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [timetableMeta, setTimetableMeta] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refreshTimetable = async () => {
+    const sRes = await getTimetableAction();
+    if (sRes.success) setSchedule(sRes.items);
+
+    const mRes = await getTimetableMetaAction();
+    if (mRes.success) setTimetableMeta(mRes.meta);
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    refreshTimetable();
+  }, []);
 
   // Sync imageSrc with DB data (Base64)
   useEffect(() => {
     if (timetableMeta?.imageBase64) {
       setImageSrc(timetableMeta.imageBase64);
-    } else if (timetableMeta?.imageBlob && timetableMeta.imageBlob instanceof Blob) {
-      // Legacy fallback
-      const url = URL.createObjectURL(timetableMeta.imageBlob);
-      setImageSrc(url);
-      return () => URL.revokeObjectURL(url);
     } else {
       setImageSrc(null);
     }
   }, [timetableMeta]);
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const form = useForm<z.infer<typeof manualEntrySchema>>({
     resolver: zodResolver(manualEntrySchema),
@@ -66,10 +82,13 @@ export function TimetableView() {
   });
 
   const onManualSubmit = async (values: z.infer<typeof manualEntrySchema>) => {
-    await db.timetable.add(values);
-    setIsAddOpen(false);
-    toast({ title: "Class added successfully" });
-    form.reset();
+    const res = await addTimetableItemAction(values);
+    if (res.success) {
+      setIsAddOpen(false);
+      toast({ title: "Class added successfully" });
+      form.reset();
+      refreshTimetable();
+    }
   };
 
   // Helper to extract progress percentage from WebLLM messages
@@ -101,16 +120,14 @@ export function TimetableView() {
       reader.onloadend = async () => {
         const base64String = reader.result as string;
 
-        await db.timetableMeta.put({
-          id: 1,
-          imageBase64: base64String, // Store string directly
-          uploadedAt: new Date()
-        });
-
-        toast({
-          title: "Schedule Image Saved",
-          description: "Your timetable reference has been updated.",
-        });
+        const res = await updateTimetableMetaAction({ imageBase64: base64String });
+        if (res.success) {
+          toast({
+            title: "Schedule Image Saved",
+            description: "Your timetable reference has been updated.",
+          });
+          refreshTimetable();
+        }
         setIsUploading(false);
       };
       reader.readAsDataURL(file);
@@ -124,9 +141,11 @@ export function TimetableView() {
 
   const handleClear = async () => {
     if (confirm("Are you sure you want to clear your timetable and remove the image?")) {
-      await db.timetable.clear();
-      await db.timetableMeta.delete(1);
-      toast({ title: "Timetable cleared" });
+      const res = await clearTimetableAction();
+      if (res.success) {
+        toast({ title: "Timetable cleared" });
+        refreshTimetable();
+      }
     }
   };
 
@@ -135,7 +154,12 @@ export function TimetableView() {
   const handleDeleteClass = (id?: number) => {
     if (!id) return;
     deleteItem(
-      async () => await db.timetable.delete(id),
+      async () => {
+        const res = await deleteTimetableItemAction(id);
+        if (res.success) {
+          refreshTimetable();
+        }
+      },
       { successMessage: "Class removed" }
     );
   };

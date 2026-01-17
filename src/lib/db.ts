@@ -24,6 +24,7 @@ export interface DocumentEntry {
     processed?: boolean;
     pageCount?: number;
     hierarchy?: any; // Cached JSON tree of structure
+    summary?: string; // AI generated summary
 }
 
 export interface ChatMessageEntry {

@@ -1,4 +1,6 @@
-import { db } from '../db';
+import { db } from '../db/index';
+import { subjectMastery } from '../db/schema';
+import { eq } from 'drizzle-orm';
 
 export const DIFFICULTY_LEVELS = {
     1: 'Novice',
@@ -13,69 +15,58 @@ const DEMOTION_THRESHOLD = 40;  // % Score to Level Down
 
 /**
  * Updates the mastery record for a topic based on quiz performance.
- * Implements deterministic progression logic using the 'subjectMastery' table.
  */
 export async function updateTopicMastery(topicId: string, scorePercentage: number, questionsCount: number) {
-    // Query using the correct table 'subjectMastery'
-    const existing = await db.subjectMastery.where('topicId').equals(topicId).first();
+    const existing = await db.select().from(subjectMastery).where(eq(subjectMastery.topicId, topicId)).get();
 
     let currentScore = existing?.masteryScore || 0;
     const oldLevel = getLevelFromScore(currentScore);
 
-    // Rule-Based Logic: Update Score based on Performance
     if (scorePercentage >= PROMOTION_THRESHOLD) {
-        // Increase score (capped at 100)
         const boost = 15;
         currentScore = Math.min(100, currentScore + boost);
     } else if (scorePercentage <= DEMOTION_THRESHOLD) {
-        // Decrease score (floor at 0)
         const penalty = 10;
         currentScore = Math.max(0, currentScore - penalty);
     } else {
-        // Small boost for consistent practice
         currentScore = Math.min(100, currentScore + 2);
     }
 
     const newLevel = getLevelFromScore(currentScore);
     const levelChange = newLevel - oldLevel;
 
-    // Save to DB
     if (existing) {
-        await db.subjectMastery.update(existing.id!, {
+        await db.update(subjectMastery).set({
             masteryScore: currentScore,
-            lastRevised: new Date()
-        });
+            lastAssessmentDate: new Date()
+        }).where(eq(subjectMastery.id, existing.id));
     } else {
-        await db.subjectMastery.add({
+        await db.insert(subjectMastery).values({
             topicId,
-            subject: 'General', // Default if unknown
+            subject: 'General',
             masteryScore: currentScore,
-            confidenceScore: 50,
-            lastRevised: new Date(),
-            nextReviewDate: new Date(Date.now() + 24 * 60 * 60 * 1000)
-        } as any);
+            lastAssessmentDate: new Date()
+        });
     }
 
     return {
         newLevel,
         levelChange,
-        xpGained: scorePercentage, // Simple XP
+        xpGained: scorePercentage,
         message: getLevelChangeMessage(levelChange, newLevel)
     };
 }
 
 function getLevelFromScore(score: number): number {
-    if (score >= 90) return 5; // Expert
-    if (score >= 70) return 4; // Advanced
-    if (score >= 50) return 3; // Intermediate
-    if (score >= 30) return 2; // Beginner
-    return 1; // Novice
+    if (score >= 90) return 5;
+    if (score >= 70) return 4;
+    if (score >= 50) return 3;
+    if (score >= 30) return 2;
+    return 1;
 }
 
 function getLevelChangeMessage(change: number, newLevel: number): string {
-    // Safe access to level name
     const levelName = DIFFICULTY_LEVELS[newLevel as keyof typeof DIFFICULTY_LEVELS] || 'Learner';
-
     if (change > 0) return `Level Up! You are now a ${levelName}.`;
     if (change < 0) return `Dropping to ${levelName} to reinforce basics.`;
     return `Keep practicing to reach the next level!`;

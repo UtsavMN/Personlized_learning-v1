@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { getMasteryAction, getProfileAction, wipeAllDataAction, updateMasteryAction } from '@/app/actions/user';
+import { getDocumentsAction } from '@/app/actions/documents';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,22 +14,25 @@ export default function AdminPage() {
     const [counts, setCounts] = useState<Record<string, number>>({});
     const [isLoading, setIsLoading] = useState(false);
 
-    // Live Data viewers
-    const profile = useLiveQuery(() => db.learnerProfile.toArray());
-    const mastery = useLiveQuery(() => db.subjectMastery.toArray());
-    const timetable = useLiveQuery(() => db.timetable.toArray());
+    const [profile, setProfile] = useState<any[]>([]);
+    const [mastery, setMastery] = useState<any[]>([]);
+    const [timetable, setTimetable] = useState<any[]>([]);
 
     const refreshCounts = async () => {
-        const tables = [
-            'learnerProfile', 'subjectMastery', 'timetable',
-            'documents', 'chatHistory', 'analytics',
-            'quizResults', 'tasks', 'hobbies', 'questions'
-        ];
-        const newCounts: Record<string, number> = {};
-        for (const t of tables) {
-            newCounts[t] = await db.table(t).count();
-        }
-        setCounts(newCounts);
+        setIsLoading(true);
+        const pRes = await getProfileAction('dev_utsav');
+        const mRes = await getMasteryAction();
+        const dRes = await getDocumentsAction();
+
+        setCounts({
+            profile: pRes.success ? 1 : 0,
+            mastery: mRes.success ? mRes.mastery.length : 0,
+            documents: dRes.success ? dRes.documents.length : 0
+        });
+
+        if (pRes.success) setProfile(pRes.profile ? [pRes.profile] : []);
+        if (mRes.success) setMastery(mRes.mastery);
+        setIsLoading(false);
     };
 
     useEffect(() => {
@@ -37,38 +40,28 @@ export default function AdminPage() {
     }, []);
 
     const handleNuclearWipe = async () => {
-        if (!confirm("NUCLEAR WARNING: This will DELETE the entire database file from the browser. Everything will be lost. The app will reload and recreate a fresh empty DB.")) return;
+        if (!confirm("This will clear all user data in SQLite.")) return;
 
         setIsLoading(true);
         try {
-            await db.delete();
-            alert("Database deleted. Reloading now...");
+            await wipeAllDataAction();
+            alert("Database wiped. Reloading now...");
             window.location.href = '/';
         } catch (e: any) {
-            alert("Delete failed: " + e.message);
+            alert("Wipe failed: " + e.message);
             setIsLoading(false);
         }
     };
 
     const handleForceOnboarding = async () => {
-        if (!confirm("Delete profile? This should force the app to show Onboarding.")) return;
-        await db.learnerProfile.clear();
-        await db.subjectMastery.clear();
+        if (!confirm("Wipe profile to force re-onboarding?")) return;
+        await wipeAllDataAction(); // Simplest way
         toast({ title: "Profile Wiped", description: "Redirecting to Dashboard..." });
         setTimeout(() => window.location.href = '/', 1000);
     };
 
     const handleAddTestSubject = async () => {
-        await db.subjectMastery.add({
-            topicId: 'test-subject',
-            subject: 'Test Subject',
-            masteryScore: 50,
-            confidenceScore: 50,
-            level: 1,
-            xp: 0,
-            lastRevised: new Date(),
-            nextReviewDate: new Date()
-        });
+        await updateMasteryAction('Test Subject', 'test-subject', 50, 0);
         toast({ title: "Added 'Test Subject'" });
         refreshCounts();
     };

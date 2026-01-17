@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useLocalAuth } from '@/lib/auth-context';
-import { db } from '@/lib/db';
+import { updateProfileAction, updateMasteryAction } from '@/app/actions/user';
 import { generateTopicId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,41 +66,29 @@ export function OnboardingView() {
             const validSubjects = subjects.filter(s => s.trim() !== '');
 
             // 1. Create Learner Profile
-            await db.learnerProfile.put({
-
-                userId: user.uid, // Required by index
+            const profileRes = await updateProfileAction(user.uid, {
                 name: user.displayName || 'Student',
-                learningStyle: 'visual', // Default, can be refined later
+                learningStyle: 'visual',
                 preferredTime: preferredTime as 'morning' | 'evening',
                 availableHoursPerWeek: parseInt(studyHours) || 10,
                 semester: semester || '1',
                 branch: branch || 'Undeclared',
-                goals: goals.split('\n').filter(g => g.trim().length > 0),
-                metrics: {
-                    streak: 0,
-                    lastStudySession: new Date() // Initialize timestamp
-                }
+                goals: JSON.stringify(goals.split('\n').filter(g => g.trim().length > 0)),
+                onboarded: true
             });
 
-            // 2. Initialize Subject Mastery (Strictly 0)
-            const masteryEntries = validSubjects.map(sub => ({
+            if (!profileRes.success) {
+                throw new Error('Failed to create profile');
+            }
 
-                topicId: generateTopicId(sub),
-                subject: sub.trim(),
-                masteryScore: 0,
-                confidenceScore: 0,
-                level: 1,
-                xp: 0,
-                lastRevised: new Date(),
-                nextReviewDate: new Date()
-            }));
+            // 2. Initialize Subject Mastery
+            for (const sub of validSubjects) {
+                await updateMasteryAction(sub.trim(), generateTopicId(sub), 0, 0);
+            }
 
-            // Clear old if matching (safety) then add new
-            await db.subjectMastery.clear();
-            await db.subjectMastery.bulkAdd(masteryEntries);
-
-            // 3. Reload to start app
-            window.location.reload();
+            // 3. Navigate to dashboard
+            toast({ title: "Welcome to Mentora!", description: "Your profile has been created successfully." });
+            window.location.href = '/dashboard';
 
         } catch (e) {
             console.error(e);

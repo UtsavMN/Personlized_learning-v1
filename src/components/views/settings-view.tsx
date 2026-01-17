@@ -1,20 +1,33 @@
-'use client';
-
 import { useLocalAuth } from '@/lib/auth-context';
 import { FactoryResetWidget } from '@/components/factory-reset';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, ShieldAlert, Mail, Plus, X, Save, Target, Brain, TrendingUp } from 'lucide-react';
+import { User, ShieldAlert, Mail, Plus, X, Save, Target, Brain, TrendingUp, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { db } from '@/lib/db';
 import { cn, generateTopicId } from '@/lib/utils';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    getProfileAction,
+    updateProfileAction,
+    getMasteryAction,
+    updateMasteryAction,
+    deleteMasteryItemAction
+} from '@/app/actions/user';
 import { useDelete } from '@/hooks/use-delete';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function SettingsView() {
     const { user } = useLocalAuth();
@@ -109,23 +122,27 @@ export function SettingsView() {
 }
 
 
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
 function ProfileEditor() {
     const { user } = useLocalAuth();
-    const profile = useLiveQuery(() => db.learnerProfile.where('userId').equals(user?.uid || "").first());
-    const mastery = useLiveQuery(() => db.subjectMastery.toArray());
-
+    const [profile, setProfile] = useState<any>(null);
+    const [mastery, setMastery] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
+
+    const refreshData = async () => {
+        if (!user) return;
+        const pRes = await getProfileAction(user.uid);
+        if (pRes.success) setProfile(pRes.profile);
+
+        const mRes = await getMasteryAction();
+        if (mRes.success) setMastery(mRes.mastery);
+
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        refreshData();
+    }, [user]);
 
     // Form State
     const [name, setName] = useState("");
@@ -140,8 +157,8 @@ function ProfileEditor() {
 
     useEffect(() => {
         if (profile) {
-            setName(profile.name);
-            setGoals(profile.goals.join('\n'));
+            setName(profile.name || "");
+            setGoals(Array.isArray(profile.goals) ? profile.goals.join('\n') : (typeof profile.goals === 'string' ? JSON.parse(profile.goals).join('\n') : ""));
             setSemester(profile.semester || "1");
             setBranch(profile.branch || "");
             setStudyHours(profile.availableHoursPerWeek?.toString() || "10");
@@ -156,19 +173,9 @@ function ProfileEditor() {
         }
 
         try {
-            let profileId = profile?.id;
-            if (!profileId) {
-                const p = await db.learnerProfile.where('userId').equals(user.uid).first();
-                profileId = p?.id;
-            }
-
-            if (!profileId) {
-                throw new Error("Profile record not found on disk.");
-            }
-
-            await db.learnerProfile.update(profileId, {
+            await updateProfileAction(user.uid, {
                 name: name,
-                goals: goals.split('\n').filter(g => g.trim().length > 0),
+                goals: JSON.stringify(goals.split('\n').filter(g => g.trim().length > 0)),
                 semester: semester,
                 branch: branch,
                 availableHoursPerWeek: parseInt(studyHours) || 10,
@@ -176,6 +183,7 @@ function ProfileEditor() {
             });
 
             setIsEditing(false);
+            refreshData();
             toast({ title: "Profile Updated", description: "Your changes have been saved." });
         } catch (e: any) {
             console.error("Profile Update Failed:", e);
@@ -186,28 +194,13 @@ function ProfileEditor() {
     const handleAddSubject = async () => {
         if (!newSubject.trim()) return;
         const sub = newSubject.trim();
-        const id = generateTopicId(sub);
-
-        const exists = await db.subjectMastery.where('topicId').equals(id).count();
-        if (exists > 0) {
-            toast({ title: "Subject already exists", description: "You are already tracking this subject.", variant: "destructive" });
-            return;
-        }
+        const tid = generateTopicId(sub);
 
         try {
-            await db.subjectMastery.add({
-                topicId: id,
-                subject: sub,
-                masteryScore: 0,
-                confidenceScore: 0,
-                level: 1,
-                xp: 0,
-                lastRevised: new Date(),
-                nextReviewDate: new Date()
-            });
-
+            await updateMasteryAction(sub, tid, 0, 0);
             toast({ title: "Subject Added", description: `${sub} is now in your mastery tracker.` });
             setNewSubject("");
+            refreshData();
         } catch (e) {
             console.error("Add Subject Error:", e);
             toast({ title: "Error", description: "Could not add subject.", variant: "destructive" });
@@ -222,9 +215,8 @@ function ProfileEditor() {
 
         deleteItem(async () => {
             if (item.id) {
-                await db.subjectMastery.delete(item.id);
-            } else if (item.topicId) {
-                await db.subjectMastery.where('topicId').equals(item.topicId).delete();
+                await deleteMasteryItemAction(item.id);
+                refreshData();
             } else {
                 throw new Error("Could not identify subject to delete.");
             }

@@ -3,34 +3,44 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useLocalAuth } from "@/lib/auth-context";
-import { db, LearnerProfile, SubjectMastery } from "@/lib/db";
-import { useLiveQuery } from "dexie-react-hooks";
-import { Brain, Flame, Clock, BookOpen, ArrowUpRight, Target } from "lucide-react";
+import { Brain, Flame, Clock, BookOpen, ArrowUpRight, Target, Loader2, Cpu, CheckCircle2, ShieldCheck } from "lucide-react";
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { Button } from '@/components/ui/button';
 import { AIRecommendationsWidget } from '../widgets/ai-recommendations';
 import { AIReasoningPanel } from '../widgets/ai-reasoning-panel';
 import { toast } from '@/hooks/use-toast';
 import { StatsCard, ActionItem } from '@/components/dashboard-widgets';
+import { getProfileAction, getMasteryAction } from '@/app/actions/user';
+import { Progress } from "@/components/ui/progress";
 
 export function DashboardView() {
     const { user } = useLocalAuth();
-    const profile = useLiveQuery(
-        async () => {
-            if (!user) return null;
-            return await db.learnerProfile.where('userId').equals(user.uid).first()
-                || await db.learnerProfile.toCollection().first();
-        },
-        [user]
-    );
+    const [profile, setProfile] = useState<any>(null);
+    const [masteryItems, setMasteryItems] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const masteryItems = useLiveQuery(() => db.subjectMastery.toArray());
-    const totalXp = masteryItems?.reduce((sum, item) => sum + (item.xp || 0), 0) || 0;
+    const refreshData = async () => {
+        if (!user) return;
+        const pRes = await getProfileAction(user.uid);
+        if (pRes.success) setProfile(pRes.profile);
 
-    if (profile === undefined) return <div className="p-8 flex items-center justify-center animate-pulse">Loading Profile...</div>;
-    if (profile === null) return (
+        const mRes = await getMasteryAction();
+        if (mRes.success) setMasteryItems(mRes.mastery);
+
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        refreshData();
+    }, [user]);
+
+    const totalXp = masteryItems?.reduce((sum, item) => sum + (item.xp || 0), 0) || (profile?.totalXp || 0);
+
+    if (loading) return <div className="p-8 flex items-center justify-center animate-pulse">Loading Analytics...</div>;
+
+    if (!profile) return (
         <div className="h-full flex flex-col items-center justify-center p-4">
-            <OnboardingWizard />
+            <OnboardingWizard onComplete={refreshData} />
         </div>
     );
 
@@ -59,7 +69,7 @@ export function DashboardView() {
                             <p className="text-xs text-blue-100 uppercase tracking-widest font-semibold">Streak</p>
                             <div className="flex items-center gap-2">
                                 <Flame className="w-5 h-5 text-orange-400 fill-orange-400" />
-                                <p className="text-2xl font-bold">{profile.metrics.streak}</p>
+                                <p className="text-2xl font-bold">{profile.streak || 0}</p>
                             </div>
                         </div>
                     </div>
@@ -148,10 +158,10 @@ export function DashboardView() {
                 </div>
             </div>
 
-            {/* Offline Model Widget - moved here since Smart Agent section was removed */}
+            {/* Offline Model Widget - Refactored for Ollama */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div>
-                    <OfflineAIWidget />
+                    <OllamaStatusWidget />
                 </div>
             </div>
 
@@ -162,89 +172,28 @@ export function DashboardView() {
     );
 }
 
-import { webLLM } from '@/lib/ai/llm-engine';
-import { Progress } from "@/components/ui/progress";
-import { Download, CheckCircle2, Cpu } from 'lucide-react';
-import { RLSchedulerView } from './rl-scheduler-view';
-
-function OfflineAIWidget() {
-    const [progress, setProgress] = useState(0);
-    const [status, setStatus] = useState<'idle' | 'downloading' | 'ready'>('idle');
-    const [text, setText] = useState("");
-
-    useEffect(() => {
-        // Check initial state
-        if (webLLM.isLoaded) setStatus('ready');
-    }, []);
-
-    const startDownload = async () => {
-        setStatus('downloading');
-        try {
-            await webLLM.init((report) => {
-                setProgress(report.progress * 100);
-                setText(report.text);
-            });
-            setStatus('ready');
-        } catch (e: any) {
-            console.error(e);
-            setStatus('idle');
-
-            // Handle GPU specific errors
-            if (e.message?.includes('device') || e.message?.includes('GPU')) {
-                setText("GPU Error: Restart Browser or use Cloud Mode.");
-                toast({
-                    title: "GPU Device Lost",
-                    description: "Your graphics driver crashed. Please restart your browser completely or switch to Cloud Mode.",
-                    variant: "destructive"
-                });
-            } else {
-                setText("Download failed. Check connection.");
-            }
-        }
-    };
-
+function OllamaStatusWidget() {
     return (
         <Card className="h-full border-muted/60 shadow-md bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
-                    <Cpu className="w-5 h-5 text-blue-400" />
-                    Offline AI Model
+                    <ShieldCheck className="w-5 h-5 text-green-400" />
+                    Strict Local AI
                 </CardTitle>
                 <CardDescription className="text-slate-300">
-                    Phi-3.5 Mini (~2.5GB)
+                    Ollama Powered (Llama 3)
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                {status === 'idle' && (
-                    <div className="text-center py-6 space-y-4">
-                        <p className="text-sm text-slate-300">
-                            Download the lightweight model for fast, offline privacy.
-                        </p>
-                        <Button onClick={startDownload} className="w-full bg-blue-600 hover:bg-blue-500 text-white">
-                            <Download className="w-4 h-4 mr-2" />
-                            Download Model
-                        </Button>
+                <div className="flex flex-col items-center justify-center py-6 text-green-400 space-y-2">
+                    <div className="p-4 bg-green-500/10 rounded-full">
+                        <Cpu className="w-10 h-10" />
                     </div>
-                )}
-
-                {status === 'downloading' && (
-                    <div className="space-y-4">
-                        <div className="flex justify-between text-xs text-slate-300">
-                            <span>Downloading...</span>
-                            <span>{Math.round(progress)}%</span>
-                        </div>
-                        <Progress value={progress} className="h-2 bg-slate-700" />
-                        <p className="text-xs text-slate-400 truncate">{text}</p>
-                    </div>
-                )}
-
-                {status === 'ready' && (
-                    <div className="flex flex-col items-center justify-center py-8 text-green-400 space-y-2">
-                        <CheckCircle2 className="w-12 h-12" />
-                        <p className="font-semibold text-white">AI Ready to Serve</p>
-                        <p className="text-xs text-slate-400">Running locally on WebGPU</p>
-                    </div>
-                )}
+                    <p className="font-semibold text-white">System Active</p>
+                    <p className="text-xs text-slate-400 text-center px-4">
+                        Your AI is running entirely on this machine. No data leaves your project folder.
+                    </p>
+                </div>
             </CardContent>
         </Card>
     );

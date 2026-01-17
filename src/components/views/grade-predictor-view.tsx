@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+// TODO: Move gradePredictor logic to server action to avoid client-side database imports
 import { gradePredictor } from '@/lib/ai/grade-predictor';
+import { getGradePredictorData } from '@/app/actions/grade-predictor';
 import { Brain, TrendingUp, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,9 +17,9 @@ export function GradePredictorView() {
 
     // Mock Inputs for MVP (In real app, fetch from db.analytics)
     const [inputs, setInputs] = useState({
-        avgQuizScore: 0,
-        studyHours: 0,
-        completedTasks: 0,
+        avgQuizScore: 75,
+        studyHours: 20,
+        completedTasks: 15,
         difficulty: 0.5
     });
 
@@ -27,8 +29,15 @@ export function GradePredictorView() {
 
     const loadStats = async () => {
         try {
-            const stats = await gradePredictor.getCurrentStats();
-            setInputs(stats.raw);
+            const res = await getGradePredictorData();
+            if (res.success && res.currentStats) {
+                setInputs({
+                    avgQuizScore: res.currentStats.raw.avgQuizScore,
+                    studyHours: res.currentStats.raw.studyHours,
+                    completedTasks: res.currentStats.raw.completedTasks,
+                    difficulty: res.currentStats.raw.difficulty
+                });
+            }
         } catch (e) {
             console.error("Failed to load stats", e);
         }
@@ -39,16 +48,16 @@ export function GradePredictorView() {
         try {
             toast({ title: "Training Neural Network...", description: "Learning from your history." });
 
-            // Fetch Real Training Data
-            const trainingData = await gradePredictor.gatherTrainingData();
+            const res = await getGradePredictorData();
+            if (!res.success || !res.trainingData) throw new Error(res.error || "Failed to fetch data");
 
-            await gradePredictor.train(trainingData);
+            await gradePredictor.train(res.trainingData);
             await gradePredictor.save();
 
-            toast({ title: "Training Complete!", description: `Trained on ${trainingData.labels.length} historical sessions.` });
-        } catch (e) {
+            toast({ title: "Training Complete!", description: `Trained on ${res.trainingData.labels.length} historical sessions.` });
+        } catch (e: any) {
             console.error(e);
-            toast({ variant: "destructive", title: "Training Failed" });
+            toast({ variant: "destructive", title: "Training Failed", description: e.message });
         } finally {
             setIsTraining(false);
         }
@@ -56,12 +65,12 @@ export function GradePredictorView() {
 
     const handlePredict = async () => {
         try {
-            // Re-fetch latest stats just in case
-            const current = await gradePredictor.getCurrentStats();
-            setInputs(current.raw);
-
-            const result = gradePredictor.predict(current.inputs);
-            setPrediction(result * 100);
+            // Get fresh stats before prediction
+            const res = await getGradePredictorData();
+            if (res.success && res.currentStats) {
+                const result = gradePredictor.predict(res.currentStats.inputs);
+                setPrediction(result);
+            }
         } catch (e) {
             toast({ title: "Prediction Failed", description: "Ensure model is trained.", variant: "destructive" });
         }

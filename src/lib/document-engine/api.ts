@@ -1,46 +1,44 @@
 
-import { db, DocumentSection, DocumentFigure, DocumentChunk } from '@/lib/db';
+import { db } from '@/lib/db/index';
+import { documents, documentChunks } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const DocumentApi = {
     /**
      * Get the full text content of a document, stitched from sections.
      */
     async getFullText(docId: number): Promise<string> {
-        const sections = await db.sections.where('documentId').equals(docId).sortBy('order');
-        return sections.map(s => `${s.title}\n${s.content}`).join('\n\n');
+        const doc = await db.select().from(documents).where(eq(documents.id, docId)).get();
+        return doc?.content || "";
     },
 
     /**
      * Get the structure tree (ToC) of the document.
      */
-    async getStructure(docId: number): Promise<DocumentSection[]> {
-        return await db.sections.where('documentId').equals(docId).sortBy('order');
+    async getStructure(docId: number): Promise<any[]> {
+        // Flat structure for now since we don't have sections table
+        const chunks = await db.select().from(documentChunks).where(eq(documentChunks.documentId, docId));
+        return chunks;
     },
 
     /**
      * Get all extracted figures for a document.
      */
-    async getFigures(docId: number): Promise<DocumentFigure[]> {
-        return await db.figures.where('documentId').equals(docId).toArray();
+    async getFigures(docId: number): Promise<any[]> {
+        return []; // Not implemented in SQLite yet
     },
 
     /**
      * Search for concepts within a document using chunks.
      * Currently implements keyword matching. Vector search requires embeddings.
      */
-    async searchByConcept(docId: number, query: string): Promise<DocumentChunk[]> {
+    async searchByConcept(docId: number, query: string): Promise<any[]> {
         const lowerQuery = query.toLowerCase();
-        // Naive keyword search on chunks for V1
-        return await db.chunks
-            .where('documentId').equals(docId)
-            .filter(chunk => chunk.content.toLowerCase().includes(lowerQuery))
-            .toArray();
+        const chunks = await db.select().from(documentChunks).where(eq(documentChunks.documentId, docId));
+        return chunks.filter(chunk => chunk.content.toLowerCase().includes(lowerQuery));
     },
 
-    /**
-     * Get context chunks for RAG or Explainers
-     */
-    async getChunks(docId: number): Promise<DocumentChunk[]> {
-        return await db.chunks.where('documentId').equals(docId).toArray();
+    async getChunks(docId: number): Promise<any[]> {
+        return await db.select().from(documentChunks).where(eq(documentChunks.documentId, docId));
     }
 };

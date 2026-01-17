@@ -9,8 +9,7 @@ import { RLScheduler, rlScheduler, SchedulerState, SchedulerAction } from '@/lib
 import { BrainCircuit, ThumbsUp, ThumbsDown, Zap, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-import { db } from '@/lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { getMasteryAction } from '@/app/actions/user';
 
 export function RLSchedulerView() {
     const { toast } = useToast();
@@ -23,8 +22,19 @@ export function RLSchedulerView() {
 
     const [suggestedAction, setSuggestedAction] = useState<SchedulerAction | null>(null);
 
-    // Fetch real subjects from IndexedDB
-    const subjects = useLiveQuery(() => db.subjectMastery.toArray())?.map(s => s.subject) || [];
+    const [subjects, setSubjects] = useState<string[]>([]);
+    const [subjectsLoading, setSubjectsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchSubjects = async () => {
+            const res = await getMasteryAction();
+            if (res.success && res.mastery) {
+                setSubjects(res.mastery.map((s: any) => s.subject));
+            }
+            setSubjectsLoading(false);
+        };
+        fetchSubjects();
+    }, []);
 
     const handleSuggest = () => {
         if (subjects.length === 0) {

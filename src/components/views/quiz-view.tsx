@@ -1,15 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, QuestionEntry } from '@/lib/db';
-import { generateQuizAction } from '@/app/actions/quiz';
-import { updateTopicMastery } from '@/lib/adaptation/engine';
-import { trackEvent } from '@/lib/tracking/analytics';
+import { getDocumentsAction } from '@/app/actions/documents';
 
 import { Button } from '@/components/ui/button';
 import { generateQuizLocal } from '@/lib/ai/local-flows';
@@ -23,10 +19,20 @@ import { Loader2, CheckCircle2, XCircle, Trophy, BrainCircuit, Target, ArrowRigh
 import { Progress } from '@/components/ui/progress';
 
 const quizConfigSchema = z.object({
-    topic: z.string().min(1, 'Please select a topic'),
+    documentId: z.string().min(1, 'Please select a document'),
     difficulty: z.enum(['easy', 'medium', 'hard']),
     questionCount: z.string().transform((val) => parseInt(val, 10)),
 });
+
+interface QuestionEntry {
+    id?: number;
+    topicId?: string;
+    subject?: string;
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    explanation?: string;
+}
 
 export function QuizView() {
     const { toast } = useToast();
@@ -38,14 +44,17 @@ export function QuizView() {
     const [modelProgress, setModelProgress] = useState('');
 
     // Data fetching
-    const subjectMastery = useLiveQuery(() => db.subjectMastery.toArray());
-    const timetable = useLiveQuery(() => db.timetable.toArray());
+    const [documents, setDocuments] = useState<any[]>([]);
 
-    // Combine topics from mastery and timetable
-    const availableTopics = Array.from(new Set([
-        ...(subjectMastery?.map(m => m.topicId) || []),
-        ...(timetable?.map(t => t.subject) || [])
-    ])).filter(Boolean).sort();
+    useEffect(() => {
+        const fetchDocs = async () => {
+            const res = await getDocumentsAction();
+            if (res.success) {
+                setDocuments(res.documents);
+            }
+        };
+        fetchDocs();
+    }, []);
 
     const form = useForm<z.infer<typeof quizConfigSchema>>({
         resolver: zodResolver(quizConfigSchema),
@@ -58,63 +67,37 @@ export function QuizView() {
     const startQuiz = async (data: z.infer<typeof quizConfigSchema>) => {
         setQuizState('loading');
         try {
-            // 1. RAG Retrieval (Semantic Search)
-            // Import dynamically to avoid SSR issues with transformers.js
-            // Import dynamically to avoid SSR issues with transformers.js
-            const { searchSimilarChunks } = await import('@/lib/ai/rag-pipeline');
-
-            // Initialize Local Brain
-            if (!webLLM.isLoaded) {
-                toast({ title: "Activating Brain...", description: "Loading AI Model (One-time setup)" });
-                await webLLM.init((report) => setModelProgress(report.text));
+            if (!data.documentId) {
+                toast({ variant: "destructive", title: "Error", description: "Please select a document." });
+                setQuizState('config');
+                return;
             }
 
-            toast({ title: "Searching materials...", description: `Finding relevant content for ${data.topic}` });
+            toast({ title: "Consulting AI...", description: "Gemini is crafting your unique assessment." });
 
-            const chunks = await searchSimilarChunks(data.topic, 15); // Get top 15 relevant segments
+            // 1. Call Server Action (Gemini)
+            const { generateQuizAction } = await import('@/app/actions/quiz-new');
+            const result = await generateQuizAction(parseInt(data.documentId));
 
-            // Allow quiz even if no chunks found (Fallback to General Knowledge or Synthetic)
-            // But warning user is good.
-            if (chunks.length === 0) {
-                toast({
-                    title: "No Materials Found",
-                    description: "We couldn't find specific notes on this topic. Using general knowledge.",
-                    variant: "destructive"
-                });
+            if (!result.success || !result.quizId) {
+                throw new Error(result.error || "Failed to generate quiz");
             }
 
-            const contextStrings = chunks.map(c => c.text);
-            const fullContext = contextStrings.join('\n\n');
+            // 2. Load Generated Questions
+            const { getQuizQuestionsAction } = await import('@/app/actions/quiz-new');
+            const questionsResult = await getQuizQuestionsAction(result.quizId);
 
-            // Validate Context Quality
-            if (fullContext.length < 500) {
-                toast({
-                    title: "Low Information Density",
-                    description: "The retrieved notes are too short. Quiz quality might be low.",
-                    variant: "destructive"
-                });
+            if (!questionsResult.success || !questionsResult.questions || questionsResult.questions.length === 0) {
+                throw new Error("No questions retrieved from database.");
             }
 
-            // Generate Quiz
-            const resultQuestions = await generateQuizLocal(data.topic, fullContext, data.questionCount);
+            const quizQuestions = questionsResult.questions;
 
-            if (!resultQuestions || resultQuestions.length === 0) {
-                throw new Error("No questions generated.");
-            }
-
-            // 3. Save to local DB (cache) with synthetic source
-            const questionsToAdd = resultQuestions.map((q: any) => ({
+            // 3. Set Active State
+            setActiveQuestions(quizQuestions.map((q: any) => ({
                 ...q,
-                topicId: data.topic,
-                difficulty: data.difficulty,
-                source: 'synthetic' as const
-            }));
-
-            const ids = await Promise.all(questionsToAdd.map((q: any) => db.questions.add(q)));
-
-            // 4. Retrieve fully formated questions to set active state
-            const loadedQuestions = await db.questions.bulkGet(ids);
-            setActiveQuestions(loadedQuestions.filter(q => q !== undefined) as QuestionEntry[]);
+                options: JSON.parse(q.options), // SQLite stores JSON as string
+            })));
 
             setQuizState('active');
             setCurrentQuestionIndex(0);
@@ -126,7 +109,7 @@ export function QuizView() {
             toast({
                 variant: 'destructive',
                 title: 'Assessment Generation Failed',
-                description: 'We encountered an error preparing your questions. Please try again.',
+                description: error.message || 'We encountered an error preparing your questions.',
             });
             setQuizState('config');
         }
@@ -161,55 +144,37 @@ export function QuizView() {
 
         // Save Result
         if (activeQuestions.length > 0) {
-            const topic = activeQuestions[0].topicId;
+            const topic = activeQuestions[0].subject || 'General';
+            const tid = activeQuestions[0].topicId || 'general';
 
-            await db.quizResults.add({
-                topic: topic,
+            const { saveQuizResultAction, trackEventAction } = await import('@/app/actions/study');
+            const { updateMasteryAction } = await import('@/app/actions/user');
+
+            await saveQuizResultAction({
+                subject: topic,
                 score: percentage,
                 totalQuestions: activeQuestions.length,
                 correctAnswers: calculatedScore,
-                date: new Date(),
                 questions: activeQuestions,
             });
 
-            // --- Non-LLM Adaptation Logic ---
-            try {
-                // Update Mastery using new Engine
-                const result = await updateTopicMastery(topic, percentage, activeQuestions.length);
+            // Update Mastery
+            await updateMasteryAction(topic, tid, percentage);
 
-                // Track Analytics
-                trackEvent('quiz_complete', {
-                    topicId: topic,
-                    data: { score: percentage, levelChange: result.levelChange, newLevel: result.newLevel }
-                });
+            // Track Event
+            await trackEventAction('quiz_complete', topic, {
+                score: percentage,
+                count: activeQuestions.length
+            });
 
-                // User Feedback based on adaptation result
-                if (result.levelChange > 0) {
-                    toast({
-                        title: "Mastery Level Increased! 🌟",
-                        description: result.message,
-                        className: "bg-green-500 text-white"
-                    });
-                } else if (result.levelChange < 0) {
-                    toast({
-                        title: "Curriculum Adjusted",
-                        description: result.message,
-                    });
-                } else {
-                    toast({
-                        description: result.message,
-                    });
-                }
-            } catch (e) {
-                console.error("Failed to update mastery:", e);
-            }
+            toast({ title: "Assessment Saved", description: "Your progress has been updated." });
         }
     };
 
     // --- Render Views ---
 
     if (quizState === 'config') {
-        if (availableTopics.length === 0) {
+        if (!documents || documents.length === 0) {
             return (
                 <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-300">
                     <Card className="max-w-md w-full border-dashed border-2 shadow-sm bg-muted/30">
@@ -252,19 +217,19 @@ export function QuizView() {
                             <form onSubmit={form.handleSubmit(startQuiz)} className="space-y-6">
                                 <FormField
                                     control={form.control}
-                                    name="topic"
+                                    name="documentId"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel className="text-sm font-semibold">Select Topic</FormLabel>
+                                            <FormLabel className="text-sm font-semibold">Select Document</FormLabel>
                                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>
                                                     <SelectTrigger className="h-11">
-                                                        <SelectValue placeholder="Choose a subject..." />
+                                                        <SelectValue placeholder="Choose a document to quiz..." />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    {availableTopics.map(t => (
-                                                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                                                    {documents?.map(doc => (
+                                                        <SelectItem key={doc.id} value={String(doc.id)}>{doc.title} ({doc.subject})</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>

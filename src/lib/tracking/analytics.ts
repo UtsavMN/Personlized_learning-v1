@@ -1,30 +1,25 @@
-import { db, AnalyticsEvent } from '../db';
+import { db } from '../db/index';
+import { analytics as analyticsTable } from '../db/schema';
+import { desc } from 'drizzle-orm';
 
 /**
  * Logs a user interaction event to the local database.
  * Used for behavioral analysis and future personalization.
  */
 export async function trackEvent(
-    eventType: AnalyticsEvent['eventType'],
+    eventType: string,
     payload: { topicId?: string; documentId?: string; data?: any } = {}
 ) {
     try {
-        const event: AnalyticsEvent = {
-            userId: 'local-user', // Single user mode for now
-            eventType,
-            timestamp: Date.now(),
-            topicId: payload.topicId || 'general',
-            documentId: payload.documentId || undefined,
-            data: payload.data || {}
-        };
-
-        if (payload.topicId) event.topicId = payload.topicId;
-
-        await db.analytics.add(event as AnalyticsEvent);
+        await db.insert(analyticsTable).values({
+            event: eventType,
+            subject: payload.topicId || 'general',
+            data: payload.data ? JSON.stringify(payload.data) : null,
+            timestamp: new Date()
+        });
         console.log(`[Analytics] ${eventType}`, payload);
     } catch (error) {
         console.warn('Failed to log analytics event:', error);
-        // Don't crash the app for analytics
     }
 }
 
@@ -32,5 +27,6 @@ export async function trackEvent(
  * Analyzing time spent or struggle points (Example utility)
  */
 export async function getRecentActivity() {
-    return await db.analytics.orderBy('timestamp').reverse().limit(50).toArray();
+    const events = await db.select().from(analyticsTable).orderBy(desc(analyticsTable.timestamp)).limit(50);
+    return events;
 }

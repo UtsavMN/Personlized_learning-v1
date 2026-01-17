@@ -1,14 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Deck, Flashcard } from '@/lib/db';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useDelete } from '@/hooks/use-delete';
 import { calculateNextReview, INITIAL_CARD_STATE } from '@/lib/srs-algorithm';
+import { getDocumentsAction } from '@/app/actions/documents';
+import {
+    getFlashcardDecksAction,
+    generateFlashcardsAction,
+    deleteFlashcardDeckAction,
+    getFlashcardsAction,
+    updateFlashcardAction,
+    createFlashcardDeckAction,
+    addFlashcardAction
+} from '@/app/actions/flashcards-new';
+import { getMasteryAction } from '@/app/actions/user';
 import { Button } from '@/components/ui/button';
-import { generateFlashcardsLocal } from '@/lib/ai/local-flows';
-import { webLLM } from '@/lib/ai/llm-engine';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -19,10 +26,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, Plus, Brain, RotateCcw, Check, Sparkles, X, Layers, Play, StickyNote, Zap, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NotesView } from './notes-view';
+import { studyManager } from '@/lib/ai/study-manager';
 
 export function FlashcardsView() {
     const { toast } = useToast();
-    const decks = useLiveQuery(() => db.flashcardDecks.toArray());
+    const [decks, setDecks] = useState<any[]>([]);
     const [selectedDeck, setSelectedDeck] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState('flashcards');
 
@@ -31,8 +39,23 @@ export function FlashcardsView() {
     const [newDeckName, setNewDeckName] = useState('');
     const [selectedSubject, setSelectedSubject] = useState('General');
     const [selectedDocId, setSelectedDocId] = useState<string>('');
-    const documents = useLiveQuery(() => db.documents.toArray());
-    const masterySubjects = useLiveQuery(() => db.subjectMastery.toArray());
+    const [documents, setDocuments] = useState<any[]>([]);
+    const [masterySubjects, setMasterySubjects] = useState<any[]>([]);
+
+    const refreshData = async () => {
+        const dRes = await getFlashcardDecksAction();
+        if (dRes.success) setDecks(dRes.decks);
+
+        const docRes = await getDocumentsAction();
+        if (docRes.success) setDocuments(docRes.documents);
+
+        const masteryRes = await getMasteryAction();
+        if (masteryRes.success) setMasterySubjects(masteryRes.mastery);
+    };
+
+    useEffect(() => {
+        refreshData();
+    }, []);
 
     // Local AI State
     const [isLoadingModel, setIsLoadingModel] = useState(false);
@@ -42,76 +65,38 @@ export function FlashcardsView() {
         if (!newDeckName) return;
         setIsCreating(true);
         try {
-            const deckId = await db.flashcardDecks.add({
-                title: newDeckName,
-                subject: selectedSubject,
-                documentId: selectedDocId,
-                createdAt: Date.now()
-            });
-
             if (selectedDocId) {
-                const docIdNum = parseInt(selectedDocId);
-                const doc = await db.documents.get(docIdNum);
+                toast({ title: "Consulting AI...", description: "Gemini is generating flashcards..." });
+                const result = await generateFlashcardsAction(parseInt(selectedDocId));
 
-                if (doc) {
-                    // Initialize Local Brain
-                    setIsLoadingModel(true);
-                    await webLLM.init((report) => {
-                        setModelProgress(report.text);
-                    });
-
-                    toast({ title: "Brain Activated", description: "Analyzing document..." });
-
-                    // Fetch chunks for this document
-                    const chunks = await db.chunks.where('documentId').equals(docIdNum).toArray();
-
-                    let contextContent: string = '';
-
-                    if (chunks && chunks.length > 0) {
-                        // Pick 5 random chunks
-                        const shuffled = chunks.sort(() => 0.5 - Math.random());
-                        contextContent = shuffled.slice(0, 15).map(c => c.content).join('\n\n');
-                    } else {
-                        // Fallback
-                        contextContent = doc.content || doc.description || '';
-                    }
-
-                    if (contextContent.length > 0) {
-                        const flashcards = await generateFlashcardsLocal(contextContent, 5);
-
-                        if (flashcards.length > 0) {
-                            const cardsToAdd = flashcards.map((card) => ({
-                                deckId,
-                                front: card.front,
-                                back: card.back,
-                                ...INITIAL_CARD_STATE,
-                                nextReview: Date.now()
-                            }));
-                            await db.flashcards.bulkAdd(cardsToAdd as Flashcard[]);
-                            toast({ title: "Success", description: `Generated ${flashcards.length} cards locally` });
-                        }
-                    } else {
-                        toast({ title: "Generation Skipped", description: "No content found." });
-                    }
+                if (result.success) {
+                    toast({ title: "Success", description: "Deck created with AI flashcards." });
+                    await refreshData();
+                } else {
+                    throw new Error(result.error || "Failed to generate flashcards");
                 }
-                setNewDeckName('');
-                setSelectedDocId('');
             } else {
-                // Empty content handling
-                await db.flashcards.add({
-                    deckId,
-                    front: "Edit this card",
-                    back: "Add the answer here",
-                    ...INITIAL_CARD_STATE,
-                    nextReview: Date.now()
-                } as Flashcard);
-                toast({ title: "Deck Created", description: "Created empty deck (no content found)." });
-            }
+                const res = await createFlashcardDeckAction({
+                    title: newDeckName,
+                    subject: selectedSubject,
+                    documentId: null
+                });
 
+                if (res.success && res.deck) {
+                    await addFlashcardAction({
+                        deckId: res.deck.id,
+                        front: "New Card",
+                        back: "Answer"
+                    });
+                    toast({ title: "Deck Created", description: "Created empty deck." });
+                    await refreshData();
+                }
+            }
             setNewDeckName('');
             setSelectedDocId('');
         } catch (e: any) {
-            toast({ variant: "destructive", title: "Error", description: "Failed to create deck: " + e.message });
+            console.error(e);
+            toast({ variant: "destructive", title: "Error", description: e.message });
         } finally {
             setIsCreating(false);
             setIsLoadingModel(false);
@@ -124,10 +109,12 @@ export function FlashcardsView() {
     const handleDeleteDeck = (id: number) => {
         if (!id) return;
         deleteItem(async () => {
-            await db.transaction('rw', db.flashcardDecks, db.flashcards, async () => {
-                await db.flashcardDecks.delete(id);
-                await db.flashcards.where('deckId').equals(id).delete();
-            });
+            const res = await deleteFlashcardDeckAction(id);
+            if (res.success) {
+                await refreshData();
+            } else {
+                throw new Error(res.error);
+            }
         }, { successMessage: 'Deck Deleted' });
     };
 
@@ -179,7 +166,7 @@ export function FlashcardsView() {
                                             <select className="w-full p-2.5 text-sm border rounded-lg bg-background"
                                                 value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}>
                                                 <option value="General">General</option>
-                                                {masterySubjects?.map(s => <option key={s.id} value={s.subject}>{s.subject}</option>)}
+                                                {masterySubjects?.map((s, idx) => <option key={s.id || idx} value={s.subject}>{s.subject}</option>)}
                                                 <option value="Math">Math</option>
                                                 <option value="Science">Science</option>
                                             </select>
@@ -278,13 +265,28 @@ export function FlashcardsView() {
 
 function StudySession({ deckId, onExit }: { deckId: number, onExit: () => void }) {
     const { toast } = useToast();
-    const deck = useLiveQuery(() => db.flashcardDecks.get(deckId));
-    const cards = useLiveQuery(() => db.flashcards.where('deckId').equals(deckId).toArray());
+    const [deck, setDeck] = useState<any>(null);
+    const [cards, setCards] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0, startTime: Date.now() });
 
-    if (!cards) return <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+    useEffect(() => {
+        const load = async () => {
+            const dRes = await getFlashcardDecksAction();
+            if (dRes.success) {
+                const found = dRes.decks.find((d: any) => d.id === deckId);
+                setDeck(found);
+            }
+            const cRes = await getFlashcardsAction(deckId);
+            if (cRes.success) setCards(cRes.cards);
+            setLoading(false);
+        };
+        load();
+    }, [deckId]);
+
+    if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
     if (cards.length === 0) return <div className="h-full flex flex-col items-center justify-center"><p className="text-lg text-muted-foreground mb-4">Deck is empty.</p><Button onClick={onExit}>Back</Button></div>;
 
     const currentCard = cards[currentIndex];
@@ -303,9 +305,9 @@ function StudySession({ deckId, onExit }: { deckId: number, onExit: () => void }
             easeFactor: currentCard.easeFactor || 2.5
         });
 
-        await db.flashcards.update(currentCard.id!, {
+        await updateFlashcardAction(currentCard.id!, {
             ...newState,
-            nextReview: Date.now() + (newState.interval * 24 * 60 * 60 * 1000)
+            nextReview: new Date(Date.now() + (newState.interval * 24 * 60 * 60 * 1000))
         });
 
         setIsFlipped(false);
@@ -313,18 +315,16 @@ function StudySession({ deckId, onExit }: { deckId: number, onExit: () => void }
             setTimeout(() => setCurrentIndex(prev => prev + 1), 200);
         } else {
             const finalScore = Math.round(((sessionStats.correct + (quality >= 3 ? 1 : 0)) / (sessionStats.total + 1)) * 100);
-            // Import dynamically to avoid hydration issues if StudyManager uses browser APIs heavily on init
-            import('@/lib/ai/study-manager').then(({ studyManager }) => {
-                if (deck?.subject) {
-                    studyManager.completeSession({
-                        subject: deck.subject,
-                        activityType: 'flashcards',
-                        durationSeconds: Math.round((Date.now() - sessionStats.startTime) / 1000),
-                        scorePercent: finalScore,
-                        itemsReviewed: cards.length
-                    });
-                }
-            });
+            if (deck?.subject) {
+                // Fire and forget - doesn't need to block UI
+                studyManager.completeSession({
+                    subject: deck.subject,
+                    activityType: 'flashcards',
+                    durationSeconds: Math.round((Date.now() - sessionStats.startTime) / 1000),
+                    scorePercent: finalScore,
+                    itemsReviewed: cards.length
+                }).catch(console.error);
+            }
             toast({ title: "Session Complete", description: `You scored ${finalScore}%` });
             onExit();
         }

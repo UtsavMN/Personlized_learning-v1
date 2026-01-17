@@ -1,111 +1,148 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, TaskEntry, HobbyEntry } from '@/lib/db';
-import { TrackerIntelligence } from '@/lib/ai/tracker-intelligence';
-import { Calendar } from '@/components/ui/calendar';
+import { useState, useEffect } from 'react';
+import { format, isSameDay } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { format, isSameDay } from 'date-fns';
-import { CheckCircle2, Circle, Flame, Target, Plus, TrendingUp, Sparkles, Trophy } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { StatsCard } from '@/components/dashboard-widgets';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Plus, Sparkles, TrendingUp, Trophy, Target, Flame } from 'lucide-react';
+import { TrackerIntelligence } from '@/lib/ai/tracker-intelligence';
 import { useDelete } from '@/hooks/use-delete';
+import {
+    getTrackerItemsAction,
+    addTrackerItemAction,
+    updateTrackerItemAction,
+    deleteTrackerItemAction,
+    getHabitsAction,
+    addHabitAction,
+    updateHabitAction,
+    deleteHabitAction
+} from '@/app/actions/study';
 
 export function TrackerView() {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [activeTab, setActiveTab] = useState('tasks');
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [loading, setLoading] = useState(true);
 
     // Hobby Form State
     const [hobbyName, setHobbyName] = useState('');
     const [isHobbyDialogOpen, setIsHobbyDialogOpen] = useState(false);
 
     // Queries
-    const allTasks = useLiveQuery(() => db.tasks.toArray()) || [];
-    const hobbies = useLiveQuery(() => db.hobbies.toArray()) || [];
+    const [allTasks, setAllTasks] = useState<any[]>([]);
+    const [hobbies, setHobbies] = useState<any[]>([]);
+
+    const refreshData = async () => {
+        const tRes = await getTrackerItemsAction();
+        if (tRes.success) setAllTasks(tRes.items);
+
+        const hRes = await getHabitsAction();
+        if (hRes.success) {
+            // Parse completedDates JSON
+            const parsed = hRes.items.map((h: any) => ({
+                ...h,
+                completedDates: h.completedDates ? JSON.parse(h.completedDates) : []
+            }));
+            setHobbies(parsed);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        refreshData();
+    }, []);
 
     // Derived State
     const selectedDate = date || new Date();
 
     const dailyTasks = allTasks.filter(task =>
-        isSameDay(new Date(task.date), selectedDate)
+        isSameDay(new Date(task.deadline || task.date || Date.now()), selectedDate)
     );
 
-    const completedTasks = dailyTasks.filter(t => t.completed);
+    const completedTasks = dailyTasks.filter(t => t.status === 'Completed' || t.completed);
     const completionRate = dailyTasks.length > 0 ? (completedTasks.length / dailyTasks.length) * 100 : 0;
 
     // AI Predictions
-    const aiCompletionPred = TrackerIntelligence.predictDailyCompletionRate(allTasks);
-    const aiInsight = TrackerIntelligence.generateInsight(dailyTasks, hobbies);
+    const aiCompletionPred = TrackerIntelligence.predictDailyCompletionRate(allTasks as any);
+    const aiInsight = TrackerIntelligence.generateInsight(dailyTasks as any, hobbies as any);
 
     // Handlers
     const addTask = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!newTaskTitle.trim()) return;
 
-        await db.tasks.add({
-            title: newTaskTitle,
-            completed: false,
-            date: selectedDate, // Add for specific selected date
-            type: 'task'
+        await addTrackerItemAction({
+            subject: 'General',
+            description: newTaskTitle,
+            status: 'Pending',
+            priority: 'Medium',
+            deadline: selectedDate
         });
         setNewTaskTitle('');
+        refreshData();
     };
 
-    const toggleTask = async (task: TaskEntry) => {
-        if (task.id) {
-            await db.tasks.update(task.id, { completed: !task.completed });
-        }
+    const toggleTask = async (task: any) => {
+        await updateTrackerItemAction(task.id, {
+            status: (task.status === 'Completed' || task.completed) ? 'Pending' : 'Completed'
+        });
+        refreshData();
     };
 
     const addHobby = async () => {
         if (!hobbyName.trim()) return;
-        await db.hobbies.add({
+        await addHabitAction({
             name: hobbyName,
             frequency: 'daily',
-            durationMinutes: 30,
-            completedDates: [],
-            type: 'hobby'
+            durationMinutes: 30
         });
         setHobbyName('');
         setIsHobbyDialogOpen(false);
+        refreshData();
     };
 
-    const checkInHobby = async (hobby: HobbyEntry) => {
+    const checkInHobby = async (hobby: any) => {
         if (!hobby.id) return;
 
         // Check if already done today
-        const doneToday = hobby.completedDates.some(d => isSameDay(new Date(d), selectedDate));
+        const doneToday = hobby.completedDates.some((d: string) => isSameDay(new Date(d), selectedDate));
 
         let updatedDates = [...hobby.completedDates];
         if (doneToday) {
             // Toggle off (remove date)
-            updatedDates = updatedDates.filter(d => !isSameDay(new Date(d), selectedDate));
+            updatedDates = updatedDates.filter((d: string) => !isSameDay(new Date(d), selectedDate));
         } else {
             // Toggle on
-            updatedDates.push(selectedDate);
+            updatedDates.push(selectedDate.toISOString());
         }
 
-        await db.hobbies.update(hobby.id, { completedDates: updatedDates });
+        await updateHabitAction(hobby.id, { completedDates: JSON.stringify(updatedDates) });
+        refreshData();
     };
 
     const { deleteItem } = useDelete();
 
     const deleteHobby = (id?: number) => {
-        if (id) deleteItem(async () => await db.hobbies.delete(id), { successMessage: "Habit deleted" });
+        if (id) deleteItem(async () => {
+            await deleteHabitAction(id);
+            refreshData();
+        }, { successMessage: "Habit deleted" });
     }
 
     const deleteTask = (id?: number) => {
-        if (id) deleteItem(async () => await db.tasks.delete(id), { successMessage: "Task deleted" });
+        if (id) deleteItem(async () => {
+            await deleteTrackerItemAction(id);
+            refreshData();
+        }, { successMessage: "Task deleted" });
     }
 
 
@@ -333,5 +370,33 @@ export function TrackerView() {
 
             </div>
         </div>
+    );
+}
+
+// StatsCard Component
+interface StatsCardProps {
+    title: string;
+    value: number;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+    trend: string;
+}
+
+function StatsCard({ title, value, icon: Icon, color, trend }: StatsCardProps) {
+    return (
+        <Card className="relative overflow-hidden">
+            <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">{title}</p>
+                        <p className="text-2xl font-bold">{value}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{trend}</p>
+                    </div>
+                    <div className={`p-2 rounded-lg ${color}`}>
+                        <Icon className="w-5 h-5" />
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
     );
 }

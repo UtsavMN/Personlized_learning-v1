@@ -1,19 +1,31 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
-import { db, DocumentSection, DocumentFigure, DocumentChunk } from '@/lib/db';
+import { db } from '@/lib/db/index';
+import { documents, documentChunks } from '@/lib/db/schema';
 
 // Worker config must match the existing client
 if (typeof window !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
-interface ProcessedSection {
+interface DocumentSection {
+    id?: number;
     title: string;
     level: number;
     content: string;
     pageStart: number;
-    pageEnd: number;
-    chunks: string[];
+    pageEnd?: number;
+    parentId?: number | null;
+    chunks?: string[];
+}
+
+interface DocumentFigure {
+    documentId: number;
+    blob: Blob;
+    caption: string;
+    pageNumber: number;
+    type: string;
+    context: string;
 }
 
 export async function ingestDocument(file: File): Promise<number> {
@@ -139,54 +151,32 @@ export async function ingestDocument(file: File): Promise<number> {
     }
 
     // 3. Database Save
-    return await db.transaction('rw', db.documents, db.sections, db.figures, db.chunks, async () => {
-        // Save Metadata
-        const docId = await db.documents.add({
-            title: file.name.replace('.pdf', ''),
-            file: file, // Save original blob for reading/scanning later
-            subject: 'Uncategorized', // Default, should be updated by UI
-            type: file.type,
-            size: file.size,
-            createdAt: new Date(),
-            content: allContent, // Legacy support
-            processed: true,
-            pageCount: pdf.numPages
-        });
+    const docResult = await db.insert(documents).values({
+        title: file.name.replace('.pdf', ''),
+        subject: 'Uncategorized',
+        filePath: '', // Should be set by caller or storage logic
+        fileType: file.type,
+        fileSize: file.size,
+        content: allContent,
+        processed: true,
+    }).returning();
 
-        // Save Sections
-        for (const sec of sections) {
-            const secId = await db.sections.add({
-                ...sec,
+    const docId = docResult[0].id;
+
+    // Save Chunks
+    for (const sec of sections) {
+        const chunks = createSmartChunks(sec.content || "", 500);
+        for (const chunkText of chunks) {
+            const keywords = extractKeywords(chunkText);
+            await db.insert(documentChunks).values({
                 documentId: docId as number,
-                parentId: null, // Logic for ID linking needed if strict tree desired
-                order: sections.indexOf(sec)
-            } as DocumentSection);
-
-            // --- Smart Chunking & Keyword Extraction ---
-            const chunks = createSmartChunks(sec.content || "", 500); // ~500 chars per chunk
-
-            for (const chunkText of chunks) {
-                const keywords = extractKeywords(chunkText);
-
-                await db.chunks.add({
-                    documentId: docId as number,
-                    sectionId: secId as number,
-                    content: chunkText,
-                    keywords: keywords
-                });
-            }
-        }
-
-        // Save Figures (Placeholders for now)
-        for (const fig of figures) {
-            await db.figures.add({
-                ...fig,
-                documentId: docId as number
+                content: chunkText,
+                keywords: JSON.stringify(keywords)
             });
         }
+    }
 
-        return docId as number;
-    });
+    return docId as number;
 }
 
 // --- Helpers ---

@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { RLSchedulerView } from './rl-scheduler-view';
 import { GradePredictorView } from './grade-predictor-view';
-import { Brain, TrendingUp, Sparkles } from 'lucide-react';
+import { ChatView } from './chat-view';
+import { Brain, TrendingUp, Sparkles, MessageSquare } from 'lucide-react';
 
 export function SmartAgentView() {
     const [activeTab, setActiveTab] = useState('scheduler');
@@ -37,6 +38,9 @@ export function SmartAgentView() {
                             <TabsTrigger value="predictor" className="rounded-full flex-1 data-[state=active]:bg-purple-100 dark:data-[state=active]:bg-purple-900/30 data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-300">
                                 <TrendingUp className="w-4 h-4 mr-2" /> Grade AI
                             </TabsTrigger>
+                            <TabsTrigger value="chat" className="rounded-full flex-1 data-[state=active]:bg-green-100 dark:data-[state=active]:bg-green-900/30 data-[state=active]:text-green-600 dark:data-[state=active]:text-green-300">
+                                <MessageSquare className="w-4 h-4 mr-2" /> Chat
+                            </TabsTrigger>
                         </TabsList>
                     </Tabs>
                 </div>
@@ -44,13 +48,19 @@ export function SmartAgentView() {
 
             {/* Content Area */}
             <div className="flex-1 overflow-hidden">
-                {activeTab === 'scheduler' ? (
+                {activeTab === 'scheduler' && (
                     <div className="h-full overflow-y-auto pr-2">
                         <RLSchedulerView />
                     </div>
-                ) : (
+                )}
+                {activeTab === 'predictor' && (
                     <div className="h-full overflow-y-auto pr-2">
                         <div className="p-1"> <GradePredictorView /> </div>
+                    </div>
+                )}
+                {activeTab === 'chat' && (
+                    <div className="h-full overflow-hidden">
+                        <ChatView />
                     </div>
                 )}
             </div>

@@ -86,23 +86,34 @@ class HuggingFaceEngine {
     }
 
     /**
-     * Summarize Text
+     * Summarize Text - Optimized for speed
      */
     public async summarize(text: string): Promise<string> {
         if (!this.isAvailable || !this.hf) {
             return "Summarization unavailable: HUGGINGFACE_API_KEY is missing. Please add it to .env.local";
         }
 
+        // Ensure text is within limits and clean
+        if (!text || text.trim().length === 0) {
+            return "Text is empty";
+        }
+
+        // Limit text to 1024 characters for BART model (token limit)
+        let textToProcess = text.trim();
+        if (textToProcess.length > 1024) {
+            textToProcess = textToProcess.slice(0, 1024);
+        }
+
         try {
             const result = await this.hf.summarization({
                 model: this.MODELS.SUMMARIZATION,
-                inputs: text,
+                inputs: textToProcess,
                 parameters: {
-                    max_length: 150,
-                    min_length: 30
+                    max_length: 200, // Increased for better summaries
+                    min_length: 50  // Increased for more complete summaries
                 }
             });
-            return result.summary_text;
+            return result.summary_text || "Summary generated but empty";
         } catch (error: any) {
             console.error('[HuggingFaceEngine] Summarization Error:', error);
             if (error.message?.includes('503')) return "Model is loading (Cold Start). Please try again in 30 seconds.";

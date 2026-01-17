@@ -6,9 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Play, Pause, Square, Trophy, Flame, X } from 'lucide-react';
 import { useGamification } from '@/hooks/use-gamification';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
-import { toast } from '@/hooks/use-toast';
+import { getMasteryAction } from '@/app/actions/user';
+import { addFocusSessionAction } from '@/app/actions/study';
 
 export function FocusTimer() {
     const [timeLeft, setTimeLeft] = useState(25 * 60); // Default 25m
@@ -18,7 +17,15 @@ export function FocusTimer() {
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     const { addXP } = useGamification();
-    const subjects = useLiveQuery(() => db.subjectMastery.toArray());
+    const [subjects, setSubjects] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchSubjects = async () => {
+            const res = await getMasteryAction();
+            if (res.success) setSubjects(res.mastery);
+        };
+        fetchSubjects();
+    }, []);
 
     useEffect(() => {
         if (isActive && timeLeft > 0) {
@@ -56,7 +63,7 @@ export function FocusTimer() {
         // Award XP: 10 XP per minute focused
         const xp = duration * 10;
 
-        await db.focusSessions.add({
+        await addFocusSessionAction({
             startTime: new Date(),
             durationMinutes: duration,
             subject: subject,

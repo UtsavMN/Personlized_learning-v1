@@ -1,48 +1,74 @@
-'use client';
-
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, NoteEntry } from '@/lib/db';
+import React, { useState, useEffect } from 'react';
+import {
+    getNotesAction,
+    addNoteAction,
+    updateNoteAction,
+    deleteNoteAction
+} from '@/app/actions/study';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Search, MoreVertical, Trash2, Palette, Tag, PenLine, StickyNote, Grid, List } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    Plus,
+    Search,
+    Grid,
+    List,
+    StickyNote,
+    Trash2,
+    Palette,
+    Tag
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDelete } from '@/hooks/use-delete';
 
 const COLORS = [
     { name: 'Default', value: 'bg-card' },
-    { name: 'Red', value: 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/20' },
-    { name: 'Orange', value: 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-900/20' },
-    { name: 'Yellow', value: 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-900/20' },
-    { name: 'Green', value: 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/20' },
-    { name: 'Blue', value: 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-900/20' },
-    { name: 'Purple', value: 'bg-purple-50 dark:bg-purple-900/10 border-purple-200 dark:border-purple-900/20' },
-    { name: 'Pink', value: 'bg-pink-50 dark:bg-pink-900/10 border-pink-200 dark:border-pink-900/20' },
+    { name: 'Blue', value: 'bg-blue-100 dark:bg-blue-900/30' },
+    { name: 'Green', value: 'bg-green-100 dark:bg-green-900/30' },
+    { name: 'Yellow', value: 'bg-yellow-100 dark:bg-yellow-900/30' },
+    { name: 'Purple', value: 'bg-purple-100 dark:bg-purple-900/30' },
+    { name: 'Pink', value: 'bg-pink-100 dark:bg-pink-900/30' },
+    { name: 'Orange', value: 'bg-orange-100 dark:bg-orange-900/30' },
 ];
 
 export function NotesView() {
-    const notes = useLiveQuery(() => db.notes.orderBy('updatedAt').reverse().toArray());
+    const [notes, setNotes] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+    const refreshNotes = async () => {
+        const res = await getNotesAction();
+        if (res.success) setNotes(res.items);
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        refreshNotes();
+    }, []);
+
     // Editor State
-    const [editingNote, setEditingNote] = useState<NoteEntry | null>(null);
+    const [editingNote, setEditingNote] = useState<any | null>(null);
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLORS[0].value);
     const [subject, setSubject] = useState('');
 
     const filteredNotes = notes?.filter(note =>
-        note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.subject.toLowerCase().includes(searchQuery.toLowerCase())
+        (note.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (note.content || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (note.subject || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const handleSave = async () => {
@@ -53,16 +79,15 @@ export function NotesView() {
             content,
             subject: subject || 'General',
             color: selectedColor,
-            updatedAt: new Date(),
-            createdAt: editingNote ? editingNote.createdAt : new Date(),
         };
 
         if (editingNote && editingNote.id) {
-            await db.notes.update(editingNote.id, noteData);
+            await updateNoteAction(editingNote.id, noteData);
         } else {
-            await db.notes.add(noteData as NoteEntry);
+            await addNoteAction(noteData);
         }
 
+        refreshNotes();
         handleClose();
     };
 
@@ -75,11 +100,11 @@ export function NotesView() {
         setSelectedColor(COLORS[0].value);
     };
 
-    const handleEdit = (note: NoteEntry) => {
+    const handleEdit = (note: any) => {
         setEditingNote(note);
-        setTitle(note.title);
-        setContent(note.content);
-        setSubject(note.subject);
+        setTitle(note.title || '');
+        setContent(note.content || '');
+        setSubject(note.subject || '');
         setSelectedColor(note.color || COLORS[0].value);
         setIsCreateOpen(true);
     };
@@ -87,7 +112,10 @@ export function NotesView() {
     const { deleteItem } = useDelete();
 
     const handleDelete = (id?: number) => {
-        if (id) deleteItem(async () => await db.notes.delete(id), { successMessage: "Note deleted" });
+        if (id) deleteItem(async () => {
+            await deleteNoteAction(id);
+            refreshNotes();
+        }, { successMessage: "Note deleted" });
     };
 
     return (
@@ -155,7 +183,7 @@ export function NotesView() {
                                 <p className="text-sm text-foreground/80 whitespace-pre-wrap line-clamp-[10]">{note.content}</p>
 
                                 <div className="mt-4 flex justify-between items-center text-muted-foreground">
-                                    <span className="text-xs text-muted-foreground">{format(note.updatedAt, 'MMM d')}</span>
+                                    <span className="text-xs text-muted-foreground">{format(new Date(note.updatedAt), 'MMM d')}</span>
                                     <Button
                                         variant="ghost"
                                         size="icon"

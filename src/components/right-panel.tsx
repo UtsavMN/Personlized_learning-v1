@@ -2,7 +2,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SourcePanel } from '@/components/source-panel';
 import { ConfidenceMeter } from '@/components/confidence-meter';
-import { TraceabilityView } from '@/components/traceability-view';
 import type { ConfidenceLevel } from '@/components/confidence-meter';
 
 type RightPanelProps = {
@@ -18,7 +17,6 @@ export function RightPanel({ sources, confidence }: RightPanelProps) {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="sources">Sources</TabsTrigger>
             <TabsTrigger value="confidence">Confidence</TabsTrigger>
-            <TabsTrigger value="traceability">Trace</TabsTrigger>
           </TabsList>
           <TabsContent value="sources" className="mt-4">
             <SourcePanel sources={sources} />
@@ -26,11 +24,12 @@ export function RightPanel({ sources, confidence }: RightPanelProps) {
           <TabsContent value="confidence" className="mt-4">
             <ConfidenceMeter level={confidence} />
           </TabsContent>
-          <TabsContent value="traceability" className="mt-4">
-            <TraceabilityView />
-          </TabsContent>
         </Tabs>
       </CardContent>
     </Card>
+  );
+}
+      </CardContent >
+    </Card >
   );
 }

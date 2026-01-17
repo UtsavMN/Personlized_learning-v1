@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useUser, useClerk } from "@clerk/nextjs";
-import { db } from "@/lib/db";
+import { getProfileAction } from '@/app/actions/user';
 
 export interface LocalUser {
     uid: string;
@@ -52,12 +52,11 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
                 };
                 setUser(devUser);
 
-                // Check Dexie with dev ID
+                // Check SQLite with dev ID
                 try {
-                    const profile = await db.learnerProfile.where('userId').equals('dev_utsav').first();
+                    const res = await getProfileAction('dev_utsav');
                     // If no profile, we need onboarding.
-                    // If profile exists, we are good.
-                    setNeedsOnboarding(!profile);
+                    setNeedsOnboarding(!res.success || !res.profile);
                 } catch (e) {
                     console.error("Dev Profile check failed", e);
                 } finally {
@@ -75,10 +74,10 @@ export function LocalAuthProvider({ children }: { children: React.ReactNode }) {
                 };
                 setUser(newUser);
 
-                // Check if profile exists in Dexie
+                // Check if profile exists in SQLite
                 try {
-                    const count = await db.learnerProfile.where('userId').equals(clerkUser.id).count();
-                    setNeedsOnboarding(count === 0);
+                    const res = await getProfileAction(clerkUser.id);
+                    setNeedsOnboarding(!res.success || !res.profile);
                 } catch (e) {
                     console.error("Profile check failed", e);
                 }

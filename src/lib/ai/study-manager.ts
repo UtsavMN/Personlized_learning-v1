@@ -1,8 +1,8 @@
-
-import { db, SubjectMastery } from '@/lib/db';
 import { generateTopicId } from '@/lib/utils';
 import { gradePredictor } from './grade-predictor';
 import { rlScheduler, SchedulerState } from './rl-scheduler';
+import { getGradePredictorData } from '@/app/actions/grade-predictor';
+import { getStudyData, saveSessionToDb } from '@/app/actions/study';
 
 export type ActivityType = 'flashcards' | 'quiz' | 'reading';
 
@@ -32,32 +32,37 @@ export class StudyManager {
 
     /**
      * The Core "Brain" Function
-     * Aggregates insights from GradePredictor and RLScheduler to suggest the next best action.
      */
     public async getRecommendations(): Promise<Recommendation[]> {
         const recommendations: Recommendation[] = [];
-        const masteryItems = await db.subjectMastery.toArray();
+
+        // Fetch Data from Server
+        const [studyDataRes, gpDataRes] = await Promise.all([
+            getStudyData(),
+            getGradePredictorData()
+        ]);
+
+        if (!studyDataRes.success || !studyDataRes.masteryItems || !gpDataRes.success || !gpDataRes.currentStats) {
+            console.error("Failed to load study data for recommendations");
+            return [];
+        }
+
+        const masteryItems = studyDataRes.masteryItems;
+        const globalStats = gpDataRes.currentStats;
         const now = new Date();
         const dayOfWeek = now.getDay();
 
-        // 1. Check for Critical Gaps (Grade Predictor Logic)
-        // In a real app, we'd feed real user habits here. For now, we simulate.
         for (const item of masteryItems) {
-            // Predict grade based on Real User Habits
-            // We fetch global stats (study hours, tasks) and mix in the Subject's specific Mastery Score
-            const globalStats = await gradePredictor.getCurrentStats();
-
             const input: [number, number, number, number] = [
-                item.masteryScore / 100,      // Subject Specific Mastery
-                globalStats.inputs[1],        // Global Study Hours
-                globalStats.inputs[2],        // Global Task Comepletion
-                globalStats.inputs[3]         // Difficulty/Base
+                (item.masteryScore || 0) / 100,
+                globalStats.inputs[1],
+                globalStats.inputs[2],
+                globalStats.inputs[3]
             ];
 
             const predictedGrade = gradePredictor.predict(input);
             console.log(`[StudyManager] Predicted Grade for ${item.subject}: ${predictedGrade.toFixed(2)}%`);
 
-            // If prediction is dangerously low, flag it
             if (predictedGrade < 60) {
                 recommendations.push({
                     id: `urgent-${item.id}`,
@@ -68,17 +73,15 @@ export class StudyManager {
                     priority: 'high',
                     reason: 'Low Predicted Grade',
                     actionLabel: 'Take Emergency Quiz',
-                    route: '/?view=flashcards'
+                    route: '/?view=quiz'
                 });
             }
         }
 
-        // 2. Ask the RL Agent for a Strategy
-        // We construct the current state
         const currentState: SchedulerState = {
             dayOfWeek,
-            energyLevel: 2, // Default to Medium, could ask user
-            previousSubject: 'None' // simplified
+            energyLevel: 2,
+            previousSubject: 'None'
         };
 
         const availableSubjects = masteryItems.map(m => m.subject);
@@ -90,7 +93,7 @@ export class StudyManager {
                 title: `${suggestedAction} Focus`,
                 description: `Your smart agent suggests focusing on ${suggestedAction} right now based on your energy patterns.`,
                 subject: suggestedAction,
-                type: 'flashcards', // Defaulting to flashcards for the agent
+                type: 'flashcards',
                 priority: 'medium',
                 reason: 'Optimal Time Block (RL)',
                 actionLabel: 'Start Flashcards',
@@ -110,9 +113,8 @@ export class StudyManager {
             });
         }
 
-        // 3. Fallback / Maintenance
         if (recommendations.length === 0) {
-            const worstSubject = masteryItems.sort((a, b) => a.masteryScore - b.masteryScore)[0];
+            const worstSubject = masteryItems.sort((a, b) => (a.masteryScore ?? 0) - (b.masteryScore ?? 0))[0];
             if (worstSubject) {
                 recommendations.push({
                     id: 'maint-1',
@@ -133,74 +135,41 @@ export class StudyManager {
 
     /**
      * Called when a user completes a learning activity.
-     * Closing the loop: Updates Mastery -> Trains RL Agent -> Saves Data.
      */
     public async completeSession(data: {
         subject: string;
         activityType: ActivityType;
         durationSeconds: number;
-        scorePercent?: number; // 0-100
+        scorePercent?: number;
         itemsReviewed?: number;
     }) {
         console.log("[StudyManager] Completing Session:", data);
 
-        // 1. Update Subject Mastery
-        let mastery = await db.subjectMastery.where('subject').equals(data.subject).first();
-        if (!mastery) {
-            // Create if new
-            mastery = {
-                topicId: generateTopicId(data.subject),
-                subject: data.subject,
-                masteryScore: 50,
-                confidenceScore: 50,
-                level: 1,
-                xp: 0,
-                lastRevised: new Date(),
-                nextReviewDate: new Date()
-            } as SubjectMastery;
-            const id = await db.subjectMastery.add(mastery);
-            mastery.id = id as number;
-        }
-
-        // Simple XP Formula
         const xpEarned = Math.floor((data.durationSeconds / 60) * 10) + (data.scorePercent ? Math.floor(data.scorePercent / 10) : 0);
 
-        await db.subjectMastery.update(mastery.id!, {
-            xp: (mastery.xp || 0) + xpEarned,
-            lastRevised: new Date(),
-            // Simple moving average for score
-            masteryScore: data.scorePercent
-                ? Math.round((mastery.masteryScore * 0.8) + (data.scorePercent * 0.2))
-                : mastery.masteryScore
+        // 1. Save to DB via Server Action
+        const result = await saveSessionToDb({
+            subject: data.subject,
+            durationSeconds: data.durationSeconds,
+            scorePercent: data.scorePercent,
+            xpEarned
         });
 
-        // 2. Train RL Agent
-        // Calculate Reward
-        // +10 for High Score (>80), +5 for Completion, -5 for fail
+        // 2. Calculate Reward for RL (Client-side)
         let reward = 5;
         if (data.scorePercent && data.scorePercent >= 80) reward += 10;
         if (data.scorePercent && data.scorePercent < 40) reward -= 5;
 
         const state: SchedulerState = {
             dayOfWeek: new Date().getDay(),
-            energyLevel: 2, // simplify
+            energyLevel: 2,
             previousSubject: data.subject
         };
 
-        // We assume the action taken was studying this subject
-        // For strict Q-Learning we need the PREVIOUS state, but for this simplified app
-        // we'll update based on the just-completed action.
-        rlScheduler.learn(state, data.subject as any, reward, state); // naive update
+        // 3. Update RL Agent
+        rlScheduler.learn(state, data.subject as any, reward, state);
 
-        // 3. Log Analytics
-        await db.analytics.add({
-            eventType: 'session_complete',
-            timestamp: Date.now(),
-            topicId: data.subject,
-            data: { xp: xpEarned, duration: data.durationSeconds }
-        });
-
-        return { xpEarned, newMastery: mastery.masteryScore };
+        return { xpEarned, newMastery: result.newMasteryScore };
     }
 }
 

@@ -1,6 +1,13 @@
-import { db } from '@/lib/db';
-import { embeddingService } from './local-embeddings';
+import { db } from '@/lib/db/index';
+import { documentChunks } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import * as pdfjsLib from 'pdfjs-dist';
+
+// Lazy import embedding service to prevent module load issues
+async function getEmbeddingService() {
+    const { embeddingService } = await import('./local-embeddings');
+    return embeddingService;
+}
 
 // Ensure worker is configured (reuse logic from smart-scanner if possible, or centrally config)
 if (typeof window !== 'undefined' && 'GlobalWorkerOptions' in pdfjsLib) {
@@ -10,51 +17,77 @@ if (typeof window !== 'undefined' && 'GlobalWorkerOptions' in pdfjsLib) {
 }
 
 export async function ingestDocument(file: File, documentId: number) {
-    console.log(`Starting ingestion for Doc ID: ${documentId}`);
+    try {
+        console.log(`Starting ingestion for Doc ID: ${documentId}`);
 
-    // 1. Extract Text
-    const text = await extractTextFromPDF(file);
-    console.log(`Extracted ${text.length} characters.`);
+        // 1. Extract Text
+        const text = await extractTextFromPDF(file);
+        console.log(`Extracted ${text.length} characters.`);
 
-    // 2. Chunking
-    const chunks = chunkText(text, 500, 100); // 500 chars per chunk, 100 overlap
-    console.log(`Created ${chunks.length} chunks.`);
+        if (!text || text.trim().length === 0) {
+            console.warn('No text extracted from PDF');
+            return { success: false, error: 'No text content found in PDF', chunks: 0 };
+        }
 
-    // 3. Embedding & Saving
-    // We'll process in batches to avoid freezing UI
-    const BATCH_SIZE = 5;
+        // 2. Chunking
+        const chunks = chunkText(text, 500, 100); // 500 chars per chunk, 100 overlap
+        console.log(`Created ${chunks.length} chunks.`);
 
-    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-        const batch = chunks.slice(i, i + BATCH_SIZE);
+        if (chunks.length === 0) {
+            console.warn('No chunks created from text');
+            return { success: false, error: 'No chunks created', chunks: 0 };
+        }
 
-        await Promise.all(batch.map(async (chunk, batchIdx) => {
-            const globalIdx = i + batchIdx;
+        // 3. Embedding & Saving
+        // We'll process in batches to avoid freezing UI
+        const BATCH_SIZE = 5;
 
-            // Generate Vector
-            const vector = await embeddingService.generateEmbedding(chunk);
+        for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+            const batch = chunks.slice(i, i + BATCH_SIZE);
 
-            // Save Chunk (Metadata)
-            const chunkId = await db.chunks.add({
-                documentId,
-                sectionId: null, // Flat structure for now
-                content: chunk,
-                keywords: [], // Could imply keywords later
-            });
+            await Promise.all(batch.map(async (chunk, batchIdx) => {
+                const globalIdx = i + batchIdx;
 
-            // Save Embedding (Vector)
-            await db.embeddings.add({
-                documentId,
-                segmentId: chunkId as number, // Link to chunk
-                text: chunk, // Redundant but useful for debug/search
-                vector: vector
-            });
-        }));
+                try {
+                    // Skip empty chunks
+                    if (!chunk || chunk.trim().length === 0) {
+                        console.warn(`Skipping empty chunk at index ${globalIdx}`);
+                        return;
+                    }
 
-        console.log(`Processed batch ${i / BATCH_SIZE + 1}`);
+                    // Lazy load embedding service
+                    const embeddingService = await getEmbeddingService();
+
+                    // Generate Vector
+                    const vector = await embeddingService.generateEmbedding(chunk);
+
+                    // Validate vector
+                    if (!vector || !Array.isArray(vector) || vector.length === 0) {
+                        console.error(`Invalid vector generated for chunk ${globalIdx}`);
+                        return;
+                    }
+
+                    // Save Chunk (Metadata + Embedding)
+                    await db.insert(documentChunks).values({
+                        documentId,
+                        content: chunk,
+                        embedding: Buffer.from(new Float32Array(vector).buffer),
+                    });
+                } catch (error: any) {
+                    console.error(`Error processing chunk ${globalIdx}:`, error);
+                    // Continue with other chunks even if one fails
+                }
+            }));
+
+            console.log(`Processed batch ${i / BATCH_SIZE + 1}`);
+        }
+
+        console.log("Ingestion Complete");
+        return { success: true, chunks: chunks.length };
+    } catch (error: any) {
+        console.error('Error during document ingestion:', error);
+        return { success: false, error: error.message || 'Ingestion failed', chunks: 0 };
     }
-
-    console.log("Ingestion Complete");
-    return { success: true, chunks: chunks.length };
 }
 
 async function extractTextFromPDF(file: File): Promise<string> {
@@ -72,35 +105,37 @@ async function extractTextFromPDF(file: File): Promise<string> {
     return fullText.trim();
 }
 
-function chunkText(text: string, chunkSize: number = 500, overlap: number = 100): string[] {
+// 2. Chunking - Logical/Paragraph based (Target ~2000-3000 chars or 400-600 words)
+function chunkText(text: string, targetChunkSize: number = 2500, overlap: number = 200): string[] {
     const chunks: string[] = [];
-    let start = 0;
 
-    while (start < text.length) {
-        const end = Math.min(start + chunkSize, text.length);
-        let chunk = text.slice(start, end);
+    // Normalize newlines
+    const normalizedText = text.replace(/\r\n/g, '\n');
 
-        // Try to break at a sentence or space if not at end
-        if (end < text.length) {
-            const lastPeriod = chunk.lastIndexOf('.');
-            const lastSpace = chunk.lastIndexOf(' ');
+    // Split by double newlines to get paragraphs
+    const paragraphs = normalizedText.split(/\n\s*\n/);
 
-            if (lastPeriod > chunkSize * 0.5) {
-                chunk = chunk.slice(0, lastPeriod + 1);
-                start += (lastPeriod + 1);
-            } else if (lastSpace > chunkSize * 0.5) {
-                chunk = chunk.slice(0, lastSpace + 1);
-                start += (lastSpace + 1);
-            } else {
-                start += chunkSize - overlap;
-            }
+    let currentChunk = '';
+
+    for (const paragraph of paragraphs) {
+        // If adding this paragraph exceeds target size considerably, push current chunk
+        if (currentChunk.length + paragraph.length > targetChunkSize && currentChunk.length > 0) {
+            chunks.push(currentChunk.trim());
+
+            // Start new chunk with overlap (last few sentences of previous)
+            const lastSentences = currentChunk.match(/[^.!?]+[.!?]+(\s|$)/g)?.slice(-3).join('') || '';
+            currentChunk = lastSentences + '\n\n' + paragraph;
         } else {
-            start += chunkSize;
+            if (currentChunk.length > 0) {
+                currentChunk += '\n\n';
+            }
+            currentChunk += paragraph;
         }
-
-        chunks.push(chunk.trim());
     }
 
+    if (currentChunk.trim().length > 0) {
+        chunks.push(currentChunk.trim());
+    }
 
     return chunks;
 }
@@ -110,19 +145,21 @@ function chunkText(text: string, chunkSize: number = 500, overlap: number = 100)
 export async function searchSimilarChunks(query: string, limit: number = 3) {
     console.log(`Searching for: "${query}"`);
 
-    // 1. Embed Query
+    // 1. Embed Query (lazy load embedding service)
+    const embeddingService = await getEmbeddingService();
     const queryVector = await embeddingService.generateEmbedding(query);
 
-    // 2. Fetch All Chunks (Naive Search for now - optimize with HNSW later if needed)
-    // Dexie doesn't support vector index natively, so we scan. 
-    // fast in JS for < 10k chunks.
-    const allEmbeddings = await db.embeddings.toArray();
+    // 2. Fetch All Chunks (Naive Search for now)
+    const allChunks = await db.select().from(documentChunks);
 
     // 3. Cosine Similarity
-    const scored = allEmbeddings.map(emb => ({
-        ...emb,
-        score: cosineSimilarity(queryVector, emb.vector)
-    }));
+    const scored = allChunks.map(chunk => {
+        const vector = chunk.embedding ? Array.from(new Float32Array(chunk.embedding as Buffer)) : [];
+        return {
+            ...chunk,
+            score: vector.length > 0 ? cosineSimilarity(queryVector, vector) : 0
+        };
+    });
 
     // 4. Sort & Slice
     scored.sort((a, b) => b.score - a.score);

@@ -1,11 +1,9 @@
-import React from 'react';
-import { db } from '@/lib/db';
+import { wipeAllDataAction } from '@/app/actions/user';
 
 export function DevTools() {
     const handleReset = async () => {
         if (confirm('Delete all data?')) {
-            await db.delete();
-            await db.open();
+            await wipeAllDataAction();
             alert('Database cleared & reset.');
             window.location.reload();
         }

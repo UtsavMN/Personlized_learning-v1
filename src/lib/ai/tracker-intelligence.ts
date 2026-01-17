@@ -1,5 +1,14 @@
-import { TaskEntry, HobbyEntry } from '@/lib/db';
 import { differenceInDays, isSameDay, subDays } from 'date-fns';
+
+// Simplified types for intelligence logic
+interface TaskEntry {
+    completed: boolean | null;
+    status?: string | null;
+}
+
+interface HobbyEntry {
+    completedDates: Date[] | string[] | null;
+}
 
 export const TrackerIntelligence = {
     /**
@@ -24,12 +33,14 @@ export const TrackerIntelligence = {
      * Returns a percentage (0-100).
      */
     predictHobbyConsistency: (hobby: HobbyEntry): { score: number, label: string, streak: number } => {
-        if (!hobby.completedDates || hobby.completedDates.length === 0) {
+        // Parse dates if they are strings from JSON
+        const dates = (hobby.completedDates || []).map(d => typeof d === 'string' ? new Date(d) : d);
+        if (dates.length === 0) {
             return { score: 50, label: "New Habit", streak: 0 };
         }
 
         // Sort dates descending
-        const sortedDates = [...hobby.completedDates].sort((a, b) => b.getTime() - a.getTime());
+        const sortedDates = [...dates].sort((a, b) => b.getTime() - a.getTime());
         const lastDate = sortedDates[0];
         const today = new Date();
 

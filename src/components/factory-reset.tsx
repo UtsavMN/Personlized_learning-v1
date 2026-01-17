@@ -1,11 +1,9 @@
-'use client';
-
-import { useState } from 'react';
-import { db } from '@/lib/db';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { wipeAllDataAction } from '@/app/actions/user';
 import { toast } from '@/hooks/use-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 
 export function FactoryResetWidget() {
     const [isResetting, setIsResetting] = useState(false);
@@ -15,35 +13,15 @@ export function FactoryResetWidget() {
 
         setIsResetting(true);
         try {
-            console.log("Starting factory reset...");
-
-            // 1. Explicitly Open DB if closed
-            if (!db.isOpen()) await db.open();
-
-            // 2. Clear tables in parallel for efficiency
-            await Promise.all([
-                db.learnerProfile.clear(),
-                db.subjectMastery.clear(),
-                db.timetable.clear(),
-                db.analytics.clear(),
-                db.quizResults.clear(),
-                db.tasks.clear(),
-                db.hobbies.clear(),
-                db.chatHistory.clear(),
-                db.questions.clear(), // Clear cached questions
-                db.flashcardDecks.clear(),
-                db.flashcards.clear()
-            ]);
-
-            // Do NOT clear documents or history to match "Safe Reset" description
-            // await db.documents.clear(); 
-
-            toast({ title: "Reset Complete", description: "All progress data wiped. Reloading..." });
-
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-
+            const res = await wipeAllDataAction();
+            if (res.success) {
+                toast({ title: "Reset Complete", description: "All progress data wiped. Reloading..." });
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                throw new Error(res.error);
+            }
         } catch (e: any) {
             console.error("Reset Fatal Error:", e);
             toast({ title: "Reset Failed", description: `Error: ${e.message}. Please try again.`, variant: "destructive" });

@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { runOnboardingChat } from '@/app/actions/onboarding';
-import { db } from '@/lib/db';
 import { useLocalAuth } from '@/lib/auth-context';
 import { Loader2, Send } from 'lucide-react';
 
@@ -14,7 +13,7 @@ interface Message {
     content: string;
 }
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
     const { user } = useLocalAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
@@ -57,20 +56,20 @@ export function OnboardingWizard() {
                 setMessages([...newHistory, aiMsg]);
 
                 if (data.isComplete && data.extractedProfile && user) {
-                    // Save to DB
+                    // Save to SQLite
                     const p = data.extractedProfile;
-                    await db.learnerProfile.put({
-                        userId: user.uid,
+                    const { updateProfileAction } = await import('@/app/actions/user');
+                    await updateProfileAction(user.uid, {
                         name: p.name || user.displayName || 'Student',
                         learningStyle: p.learningStyle,
-                        goals: p.goals || [],
+                        goals: JSON.stringify(p.goals || []),
+                        interests: JSON.stringify([]), // Default
                         availableHoursPerWeek: p.availableHours || 10,
-                        preferredTime: 'morning', // Default or ask
-                        metrics: { streak: 0, lastStudySession: new Date() }
+                        onboarded: true
                     });
 
-                    // Reload to show Dashboard
-                    window.location.reload();
+                    // Callback to refresh dashboard
+                    if (onComplete) onComplete();
                 }
             }
         } catch (error) {
