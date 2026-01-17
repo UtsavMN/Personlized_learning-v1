@@ -88,7 +88,7 @@ export function OnboardingView() {
 
             // 3. Navigate to dashboard
             toast({ title: "Welcome to Mentora!", description: "Your profile has been created successfully." });
-            window.location.href = '/dashboard';
+            window.location.href = '/?view=dashboard';
 
         } catch (e) {
             console.error(e);
