@@ -70,13 +70,13 @@ function DashboardContent() {
         <div className={activeTab === 'tracker' ? 'block' : 'hidden'}><TrackerView /></div>
         <div className={activeTab === 'flashcards' ? 'block' : 'hidden'}><FlashcardsView /></div>
 
-        {/* Secondary Views: Render on demand */}
-        {activeTab === 'documents' && <DocumentView />}
-        {activeTab === 'studio' && <StudioView />}
-        {activeTab === 'quiz' && <QuizView />}
-        {activeTab === 'predictor' && <GradePredictorView />}
-        {activeTab === 'smart-agent' && <SmartAgentView />}
-        {activeTab === 'settings' && <SettingsView />}
+        {/* Secondary Views: Also Keep-Alive for speed */}
+        <div className={activeTab === 'documents' ? 'block' : 'hidden'}><DocumentView /></div>
+        <div className={activeTab === 'studio' ? 'block' : 'hidden'}><StudioView /></div>
+        <div className={activeTab === 'quiz' ? 'block' : 'hidden'}><QuizView /></div>
+        <div className={activeTab === 'predictor' ? 'block' : 'hidden'}><GradePredictorView /></div>
+        <div className={activeTab === 'smart-agent' ? 'block' : 'hidden'}><SmartAgentView /></div>
+        <div className={activeTab === 'settings' ? 'block' : 'hidden'}><SettingsView /></div>
       </>
     );
   }

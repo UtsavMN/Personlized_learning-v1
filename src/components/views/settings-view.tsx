@@ -286,8 +286,8 @@ function ProfileEditor() {
                         <Textarea value={goals} onChange={e => setGoals(e.target.value)} rows={3} />
                     ) : (
                         <div className="space-y-1">
-                            {profile.goals.length === 0 && <p className="text-sm text-muted-foreground italic">No goals set.</p>}
-                            {profile.goals.map((g, i) => (
+                            {(!profile.goals || profile.goals.length === 0) && <p className="text-sm text-muted-foreground italic">No goals set.</p>}
+                            {Array.isArray(profile.goals) && profile.goals.map((g, i) => (
                                 <div key={i} className="flex items-center gap-2 text-sm">
                                     <Target className="w-3 h-3 text-primary" />
                                     {g}
