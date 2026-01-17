@@ -105,8 +105,9 @@ export function AppSidebar({
                                         <SidebarMenuButton
                                             isActive={activeTab === item.value}
                                             onClick={() => {
-                                                onTabChange(item.value); // Optimistic update
-                                                router.push(`/?view=${item.value}`);
+                                                onTabChange(item.value); // Instant UI update
+                                                // Instant URL update without router overhead
+                                                window.history.pushState(null, '', `/?view=${item.value}`);
                                             }}
                                             tooltip={item.title}
                                         >
