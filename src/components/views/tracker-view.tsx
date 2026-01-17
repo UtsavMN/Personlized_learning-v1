@@ -214,8 +214,8 @@ export function TrackerView() {
                                                 onCheckedChange={() => toggleTask(task)}
                                                 className="w-6 h-6 rounded-full border-2 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                             />
-                                            <span className={`flex-1 text-lg transition-all ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                                {task.title}
+                                            <span className={`flex-1 text-lg transition-all ${task.status === 'Completed' || task.completed ? 'line-through text-muted-foreground' : ''}`}>
+                                                {task.description}
                                             </span>
                                             <Button
                                                 variant="ghost"
