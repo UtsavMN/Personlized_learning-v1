@@ -1,39 +1,30 @@
-# Firebase Studio
+# Mentora: AI Personalized Learning System
 
-This is a NextJS starter in Firebase Studio.
+Mentora is an intelligent, local-first learning assistant designed to adapt to your study habits.
 
-To get started, take a look at `src/app/page.tsx`.
+## Features
+- **Smart Dashboard**: Visual analytics of your study progress.
+- **The Lab**: Consolidated suite for Coding, Math, and Focus.
+- **Pulse**: Spaced-repetition flashcards generated from your notes.
+- **Local Privacy**: Your data stays on your device (IndexedDB).
 
-## Setup (local)
+## Installation
 
 1. Install dependencies:
+   ```powershell
+   npm install --legacy-peer-deps
+   ```
 
-```powershell
-cd "c:\Users\Utsav M N\OneDrive\Documents\My projects\iit ropar\minor-project"
-npm install --legacy-peer-deps
-```
+2. Setup Environment:
+   - Copy `.env.example` to `.env`
+   - Add your `GOOGLE_GENAI_API_KEY`
 
-2. Create a local `.env` file from `.env.example` and fill in keys (do not commit `.env`).
+3. Run Development Server:
+   ```powershell
+   npm run dev
+   ```
+   Open [http://localhost:9002](http://localhost:9002).
 
-3. Start the dev server (runs on port 9002 by default):
-
-```powershell
-npm run dev
-```
-
-4. Build for production (Windows PowerShell compatible):
-
-```powershell
-npm run build
-```
-
-## Notes
-
-- The repository includes a `src/firebase/config.ts` file with a Firebase config object. If you prefer, override values with environment variables instead of committing credentials.
-- Some features (GenKit / Google GenAI) require API keys that are not included here. Add them to your local `.env` as `GENKIT_API_KEY` / `GOOGLE_GENAI_API_KEY`.
-- To deploy to Firebase Hosting, install and login with the Firebase CLI and follow `firebase deploy` steps; I can prepare `DEPLOY.md` if you want.
-# Firebase Studio
-
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+## Scope & Limitations
+- **Prototype**: Relies on synthetic/baseline logic for demonstration purposes in the Evaluation Notebook.
+- **AI**: Uses Google Gemini for advanced features; requires internet connection for those specific tools.
