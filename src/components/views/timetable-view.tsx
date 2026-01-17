@@ -78,6 +78,11 @@ export function TimetableView() {
     resolver: zodResolver(manualEntrySchema),
     defaultValues: {
       type: 'Lecture',
+      day: '',
+      startTime: '',
+      endTime: '',
+      subject: '',
+      room: '',
     }
   });
 
