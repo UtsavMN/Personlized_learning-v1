@@ -16,6 +16,6 @@ All of this happens **offline** on my device, ensuring complete privacy."
 *Demonstrate these steps in the video:*
 1.  **Dashboard**: Show the "Study Tracker" and "Grade Predictor" widgets updating in real-time.
 2.  **The Lab**: Open "The Lab" and show the consolidated tools (Timer, Calculator).
-3.  **Instant Quiz**: Click "Generate Quiz". Show the **Computer Networks** questions appearing instantly (0 latency).
+3.  **Instant Quiz**: Click "Generate Quiz".
 4.  **Privacy**: Disconnect WiFi (optional) to show the app still works.
 5.  **Conclusion**: "Mentora successfully creates a personalized feedback loop: Better Scheduling -> Better Focus -> Higher Grades."
