@@ -466,92 +466,136 @@ function BrainInspector() {
 
 function ProjectArchitecture() {
     return (
-        <Card className="border-primary/20 bg-gradient-to-br from-background to-muted/50 overflow-hidden mt-8 hidden md:block">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                    <Layers className="w-6 h-6 text-primary" />
-                    Project Architecture
+        <Card className="border-primary/30 bg-gradient-to-br from-background via-muted/20 to-primary/5 overflow-hidden mt-8 hidden md:block shadow-lg">
+            <CardHeader className="border-b bg-card/50 pb-6">
+                <CardTitle className="flex items-center gap-3 text-2xl text-primary">
+                    <Layers className="w-8 h-8" />
+                    Complete System Architecture
                 </CardTitle>
-                <CardDescription className="text-sm">
-                    Hover over each tech stack layer to understand how the components of this application connect together.
+                <CardDescription className="text-base mt-2 max-w-3xl">
+                    This diagram maps the entire full-stack application. Hover over any module to see the specific technologies and how they interact to deliver a personalized, AI-driven learning experience.
                 </CardDescription>
             </CardHeader>
-            <CardContent>
-                <div className="relative flex flex-col items-center gap-8 py-8 md:p-8">
-                    {/* Flow Line Background */}
-                    <div className="absolute top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 via-purple-500 to-green-500 rounded-full opacity-20 hidden md:block" />
+            <CardContent className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                    {/* Layer 1: Frontend */}
-                    <div className="relative group w-full max-w-2xl bg-card border-2 hover:border-blue-500 transition-all duration-300 rounded-xl p-4 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full">
-                                <MonitorSmartphone className="w-8 h-8" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-lg">1. Frontend (User Interface)</h3>
-                                <div className="text-sm text-muted-foreground mt-1 leading-relaxed hidden group-hover:block transition-all fade-in">
-                                    <p><strong>Next.js (React)</strong> powers the user interface using Server-Side Rendering (SSR) for blazing fast load times.</p>
-                                    <p className="mt-1"><strong>Tailwind CSS & Radix UI</strong> are used for building beautiful, responsive, and accessible components without writing raw CSS.</p>
+                    {/* Column 1: Client & User Management */}
+                    <div className="space-y-6">
+                        <div className="relative group bg-card border-2 hover:border-blue-500 transition-all duration-300 rounded-xl p-5 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
+                                    <MonitorSmartphone className="w-6 h-6" />
                                 </div>
-                                <div className="text-sm text-muted-foreground mt-1 group-hover:hidden">Next.js • React • Tailwind CSS • Radix UI</div>
+                                <div>
+                                    <h3 className="font-bold text-lg">1. Frontend UX/UI</h3>
+                                    <div className="text-sm mt-1 mb-2 font-medium text-blue-600 dark:text-blue-400 group-hover:hidden">Next.js • React • Tailwind • Radix</div>
+                                    <div className="text-sm text-muted-foreground leading-relaxed hidden group-hover:block transition-all fade-in">
+                                        <ul className="list-disc pl-4 space-y-1">
+                                            <li><strong>Next.js 15 App Router:</strong> Server-Side Rendering (SSR) and highly optimized client hydration.</li>
+                                            <li><strong>React 19:</strong> Bleeding edge UI state management.</li>
+                                            <li><strong>Tailwind CSS & shadcn/ui (Radix):</strong> Pristine, fully accessible, and responsive styling.</li>
+                                            <li><strong>Lucide React:</strong> Consistent iconography used throughout the dashboard.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="relative group bg-card border-2 hover:border-orange-500 transition-all duration-300 rounded-xl p-5 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg">
+                                    <Lock className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg">2. Authentication</h3>
+                                    <div className="text-sm mt-1 mb-2 font-medium text-orange-600 dark:text-orange-400 group-hover:hidden">Clerk • Next.js Middleware</div>
+                                    <div className="text-sm text-muted-foreground leading-relaxed hidden group-hover:block transition-all fade-in">
+                                        <ul className="list-disc pl-4 space-y-1">
+                                            <li><strong>Clerk Auth:</strong> Enterprise-grade security handling OAuth, passwords, and sessions.</li>
+                                            <li><strong>Next.js Middleware:</strong> Edge network request interception to protect private routes before they render.</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <ArrowRight className="w-6 h-6 text-muted-foreground rotate-90 hidden md:block" />
-
-                    {/* Layer 2: Authentication */}
-                    <div className="relative group w-full max-w-2xl bg-card border-2 hover:border-orange-500 transition-all duration-300 rounded-xl p-4 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full">
-                                <Lock className="w-8 h-8" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-lg">2. Authentication & Security</h3>
-                                <div className="text-sm text-muted-foreground mt-1 leading-relaxed hidden group-hover:block transition-all fade-in">
-                                    <p><strong>Clerk</strong> manages secure user authentication, session tokens, and identity verification.</p>
-                                    <p className="mt-1">It intercepts requests via Next.js Middleware to ensure only authorized users access their personal learning data.</p>
+                    {/* Column 2: Core Platform Services */}
+                    <div className="space-y-6">
+                        <div className="relative group bg-card border-2 hover:border-green-500 transition-all duration-300 rounded-xl p-5 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg">
+                                    <Database className="w-6 h-6" />
                                 </div>
-                                <div className="text-sm text-muted-foreground mt-1 group-hover:hidden">Clerk • Next.js Middleware • Secure Sessions</div>
+                                <div>
+                                    <h3 className="font-bold text-lg">3. Backend & Database</h3>
+                                    <div className="text-sm mt-1 mb-2 font-medium text-green-600 dark:text-green-400 group-hover:hidden">Server Actions • Drizzle • Turso</div>
+                                    <div className="text-sm text-muted-foreground leading-relaxed hidden group-hover:block transition-all fade-in">
+                                        <ul className="list-disc pl-4 space-y-1">
+                                            <li><strong>Server Actions:</strong> Secure, native RPC calls directly from React Components to the server.</li>
+                                            <li><strong>Drizzle ORM:</strong> End-to-end type-safe SQL wrapper for seamless database schema mapping.</li>
+                                            <li><strong>Turso (libSQL):</strong> Serverless, scalable SQLite production database in the cloud.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="relative group bg-card border-2 hover:border-purple-500 transition-all duration-300 rounded-xl p-5 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
+                                    <Cpu className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg">4. AI Intelligence</h3>
+                                    <div className="text-sm mt-1 mb-2 font-medium text-purple-600 dark:text-purple-400 group-hover:hidden">Google Gemini • Genkit • Llama 3</div>
+                                    <div className="text-sm text-muted-foreground leading-relaxed hidden group-hover:block transition-all fade-in">
+                                        <ul className="list-disc pl-4 space-y-1">
+                                            <li><strong>Google Gemini 2.5:</strong> Cloud-based LLM powering conversational tutoring and dynamic content.</li>
+                                            <li><strong>Firebase Genkit:</strong> Pipeline orchestration for complex AI workflows (Quiz gen, summaries).</li>
+                                            <li><strong>Local Llama 3 (Ollama):</strong> Completely offline, privacy-first local AI processing fallback.</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <ArrowRight className="w-6 h-6 text-muted-foreground rotate-90 hidden md:block" />
-
-                    {/* Layer 3: Backend & DB */}
-                    <div className="relative group w-full max-w-2xl bg-card border-2 hover:border-green-500 transition-all duration-300 rounded-xl p-4 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full">
-                                <Database className="w-8 h-8" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-lg">3. Backend API & Database</h3>
-                                <div className="text-sm text-muted-foreground mt-1 leading-relaxed hidden group-hover:block transition-all fade-in">
-                                    <p>Server Actions (Next.js API) securely handle business logic symmetrically inside the React Server Components.</p>
-                                    <p className="mt-1"><strong>Drizzle ORM</strong> maps TypeScript objects to SQL queries, communicating with <strong>Turso (libSQL)</strong>, a highly scalable serverless SQLite cloud database.</p>
+                    {/* Column 3: Advanced Machine Learning & Modules */}
+                    <div className="space-y-6">
+                        <div className="relative group bg-card border-2 hover:border-rose-500 transition-all duration-300 rounded-xl p-5 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-lg">
+                                    <Brain className="w-6 h-6" />
                                 </div>
-                                <div className="text-sm text-muted-foreground mt-1 group-hover:hidden">Next.js Server Actions • Drizzle ORM • Turso (SQLite/libSQL)</div>
+                                <div>
+                                    <h3 className="font-bold text-lg">5. Machine Learning</h3>
+                                    <div className="text-sm mt-1 mb-2 font-medium text-rose-600 dark:text-rose-400 group-hover:hidden">TensorFlow.js • Q-Learning</div>
+                                    <div className="text-sm text-muted-foreground leading-relaxed hidden group-hover:block transition-all fade-in">
+                                        <ul className="list-disc pl-4 space-y-1">
+                                            <li><strong>RL Agent (Q-Learning):</strong> A custom reinforcement learning model that optimizes study habits and schedules based on feedback rewards.</li>
+                                            <li><strong>TensorFlow.js:</strong> Client-side neural network running in-browser to continuously predict grades based on real-time focus metrics.</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <ArrowRight className="w-6 h-6 text-muted-foreground rotate-90 hidden md:block" />
-
-                    {/* Layer 4: AI & ML */}
-                    <div className="relative group w-full max-w-2xl bg-card border-2 hover:border-purple-500 transition-all duration-300 rounded-xl p-4 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full">
-                                <Cpu className="w-8 h-8" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-lg">4. Artificial Intelligence & Machine Learning</h3>
-                                <div className="text-sm text-muted-foreground mt-1 leading-relaxed hidden group-hover:block transition-all fade-in">
-                                    <p><strong>Genkit & Google Gemini:</strong> Used for generating dynamic quizzes, answering RAG document queries, and parsing unstructured data.</p>
-                                    <p className="mt-1"><strong>Custom ML:</strong> Uses custom Q-Learning for scheduling habits and TensorFlow.js for predictive grade analytics.</p>
-                                    <p className="mt-1"><strong>Local AI:</strong> Falls back to Ollama natively to run Llama 3 for 100% offline, privacy-first processing.</p>
+                        <div className="relative group bg-card border-2 hover:border-indigo-500 transition-all duration-300 rounded-xl p-5 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                                    <Layers className="w-6 h-6" />
                                 </div>
-                                <div className="text-sm text-muted-foreground mt-1 group-hover:hidden">Google Gemini API • Genkit • TensorFlow.js • Local Llama 3</div>
+                                <div>
+                                    <h3 className="font-bold text-lg">6. Application Modules</h3>
+                                    <div className="text-sm mt-1 mb-2 font-medium text-indigo-600 dark:text-indigo-400 group-hover:hidden">RAG • Quizzes • Flashcards • Math</div>
+                                    <div className="text-sm text-muted-foreground leading-relaxed hidden group-hover:block transition-all fade-in">
+                                        <ul className="list-disc pl-4 space-y-1">
+                                            <li><strong>RAG Chat:</strong> Retrieval-Augmented Generation context chatting with user-uploaded PDFs.</li>
+                                            <li><strong>Smart Modules:</strong> Dynamic Flashcards, AI Quizzes, Document Note extraction, and interactive Math solving.</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
