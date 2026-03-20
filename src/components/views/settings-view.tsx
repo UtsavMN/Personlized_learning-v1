@@ -17,6 +17,7 @@ import {
     updateMasteryAction,
     deleteMasteryItemAction
 } from '@/app/actions/user';
+import { ProjectArchitectureFlowchart } from '@/components/architecture-flowchart';
 import { useDelete } from '@/hooks/use-delete';
 import {
     AlertDialog,
@@ -119,7 +120,7 @@ export function SettingsView() {
             </Card>
 
             {/* Tech Stack Architecture Flowchart */}
-            <ProjectArchitecture />
+            <ProjectArchitectureFlowchart />
         </div>
     );
 }
