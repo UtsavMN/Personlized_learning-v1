@@ -1,7 +1,7 @@
 import { useLocalAuth } from '@/lib/auth-context';
 import { FactoryResetWidget } from '@/components/factory-reset';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, ShieldAlert, Mail, Plus, X, Save, Target, Brain, TrendingUp, Loader2 } from 'lucide-react';
+import { User, ShieldAlert, Mail, Plus, X, Save, Target, Brain, TrendingUp, Loader2, Server, Database, Cpu, Layers, Lock, MonitorSmartphone, ArrowRight } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn, generateTopicId } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -117,6 +117,9 @@ export function SettingsView() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Tech Stack Architecture Flowchart */}
+            <ProjectArchitecture />
         </div>
     );
 }
@@ -458,6 +461,103 @@ function BrainInspector() {
                 Correct actions get +10. Bad actions get -5.
             </p>
         </div>
+    );
+}
+
+function ProjectArchitecture() {
+    return (
+        <Card className="border-primary/20 bg-gradient-to-br from-background to-muted/50 overflow-hidden mt-8 hidden md:block">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                    <Layers className="w-6 h-6 text-primary" />
+                    Project Architecture
+                </CardTitle>
+                <CardDescription className="text-sm">
+                    Hover over each tech stack layer to understand how the components of this application connect together.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="relative flex flex-col items-center gap-8 py-8 md:p-8">
+                    {/* Flow Line Background */}
+                    <div className="absolute top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 via-purple-500 to-green-500 rounded-full opacity-20 hidden md:block" />
+
+                    {/* Layer 1: Frontend */}
+                    <div className="relative group w-full max-w-2xl bg-card border-2 hover:border-blue-500 transition-all duration-300 rounded-xl p-4 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full">
+                                <MonitorSmartphone className="w-8 h-8" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-lg">1. Frontend (User Interface)</h3>
+                                <div className="text-sm text-muted-foreground mt-1 leading-relaxed hidden group-hover:block transition-all fade-in">
+                                    <p><strong>Next.js (React)</strong> powers the user interface using Server-Side Rendering (SSR) for blazing fast load times.</p>
+                                    <p className="mt-1"><strong>Tailwind CSS & Radix UI</strong> are used for building beautiful, responsive, and accessible components without writing raw CSS.</p>
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-1 group-hover:hidden">Next.js • React • Tailwind CSS • Radix UI</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ArrowRight className="w-6 h-6 text-muted-foreground rotate-90 hidden md:block" />
+
+                    {/* Layer 2: Authentication */}
+                    <div className="relative group w-full max-w-2xl bg-card border-2 hover:border-orange-500 transition-all duration-300 rounded-xl p-4 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full">
+                                <Lock className="w-8 h-8" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-lg">2. Authentication & Security</h3>
+                                <div className="text-sm text-muted-foreground mt-1 leading-relaxed hidden group-hover:block transition-all fade-in">
+                                    <p><strong>Clerk</strong> manages secure user authentication, session tokens, and identity verification.</p>
+                                    <p className="mt-1">It intercepts requests via Next.js Middleware to ensure only authorized users access their personal learning data.</p>
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-1 group-hover:hidden">Clerk • Next.js Middleware • Secure Sessions</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ArrowRight className="w-6 h-6 text-muted-foreground rotate-90 hidden md:block" />
+
+                    {/* Layer 3: Backend & DB */}
+                    <div className="relative group w-full max-w-2xl bg-card border-2 hover:border-green-500 transition-all duration-300 rounded-xl p-4 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full">
+                                <Database className="w-8 h-8" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-lg">3. Backend API & Database</h3>
+                                <div className="text-sm text-muted-foreground mt-1 leading-relaxed hidden group-hover:block transition-all fade-in">
+                                    <p>Server Actions (Next.js API) securely handle business logic symmetrically inside the React Server Components.</p>
+                                    <p className="mt-1"><strong>Drizzle ORM</strong> maps TypeScript objects to SQL queries, communicating with <strong>Turso (libSQL)</strong>, a highly scalable serverless SQLite cloud database.</p>
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-1 group-hover:hidden">Next.js Server Actions • Drizzle ORM • Turso (SQLite/libSQL)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ArrowRight className="w-6 h-6 text-muted-foreground rotate-90 hidden md:block" />
+
+                    {/* Layer 4: AI & ML */}
+                    <div className="relative group w-full max-w-2xl bg-card border-2 hover:border-purple-500 transition-all duration-300 rounded-xl p-4 shadow-sm hover:shadow-md z-10 hover:-translate-y-1">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full">
+                                <Cpu className="w-8 h-8" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-lg">4. Artificial Intelligence & Machine Learning</h3>
+                                <div className="text-sm text-muted-foreground mt-1 leading-relaxed hidden group-hover:block transition-all fade-in">
+                                    <p><strong>Genkit & Google Gemini:</strong> Used for generating dynamic quizzes, answering RAG document queries, and parsing unstructured data.</p>
+                                    <p className="mt-1"><strong>Custom ML:</strong> Uses custom Q-Learning for scheduling habits and TensorFlow.js for predictive grade analytics.</p>
+                                    <p className="mt-1"><strong>Local AI:</strong> Falls back to Ollama natively to run Llama 3 for 100% offline, privacy-first processing.</p>
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-1 group-hover:hidden">Google Gemini API • Genkit • TensorFlow.js • Local Llama 3</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
     );
 }
 
